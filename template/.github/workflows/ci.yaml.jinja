@@ -70,7 +70,7 @@ jobs:
 
   ephemeral-test:
     uses: ./.github/workflows/pulumi-aws.yml
-    needs: [ lint ]
+    needs: [ lint, get-values ]
     with:
       AWS_REGION: {% endraw %}{{ aws_region_for_stack }}{% raw %}
       PULUMI_STACK_NAME: test # TODO: make this related to the PR name
@@ -78,7 +78,7 @@ jobs:
       DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure
       PULUMI_PREVIEW: true
       PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
-      AWS_ACCOUNT_ID: "{% endraw %}{{ aws_staging_account_id }}{% raw %}"
+      AWS_ACCOUNT_ID: "{% endraw %}{{ aws_test_account_id }}{% raw %}"
 
   staging-preview:
     uses: ./.github/workflows/pulumi-aws.yml
