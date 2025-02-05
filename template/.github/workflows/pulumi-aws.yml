@@ -1,0 +1,102 @@
+name: Pulumi Advanced Test Env on AWS
+
+on:
+  workflow_call:
+    inputs:
+      AWS_REGION:
+        required: false
+        default: us-east-1
+        type: string
+      PULUMI_PREVIEW:
+        required: false
+        default: false
+        type: boolean
+      PREVIEW_ROLE_NAME:
+        required: false
+        default: ''
+        type: string
+      AWS_ACCOUNT_ID:
+        required: true
+        type: string
+      DEPLOY_SCRIPT_MODULE_NAME:
+        required: true
+        type: string
+      DEPLOY_SCRIPT_NAME:
+        required: false
+        type: string
+        default: pulumi_deploy
+      PULUMI_UP:
+        required: false
+        default: false
+        type: boolean
+      PULUMI_UP_ROLE_NAME:
+        required: false
+        default: ''
+        type: string
+      PULUMI_INTEGRATION_TEST:
+        required: false
+        default: false
+        type: boolean
+      PULUMI_DESTROY:
+        required: false
+        default: false
+        type: boolean
+      PULUMI_STACK_NAME:
+        required: true
+        type: string
+      PYTHON_VERSION:
+        required: true
+        type: string
+
+
+env:
+  PYTHONUNBUFFERED: True
+  PRE_COMMIT_HOME: ${{ github.workspace }}/.precommit_cache
+
+permissions:
+    id-token: write
+    contents: write # needed for mutex
+
+jobs:
+  pulumi:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: Install latest versions of python packages
+        uses: ./.github/actions/install_deps_uv
+        with:
+          python-version: ${{ inputs.PYTHON_VERSION }}
+
+      - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
+        uses: ben-z/gh-action-mutex@d3d5b354d460d4b6a1e3ee5b7951678658327812 # v1.0.0-alpha.9
+        with:
+          branch: mutex-pulumi-${{ inputs.PULUMI_STACK_NAME }}
+        timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
+
+      - name: Preview
+        uses: ./.github/actions/pulumi_ephemeral_deploy
+        if: ${{ inputs.PULUMI_PREVIEW }}
+        with:
+          project-dir: "."
+          deploy-script-module-name: ${{ inputs.DEPLOY_SCRIPT_MODULE_NAME }}
+          stack-name: ${{ inputs.PULUMI_STACK_NAME }}
+          aws-role-name: ${{ inputs.PREVIEW_ROLE_NAME }}
+          deploy-script-name: ${{ inputs.DEPLOY_SCRIPT_NAME }}
+          aws-region: us-east-1
+          aws-account-id: ${{ inputs.AWS_ACCOUNT_ID }}
+        timeout-minutes: 5 # apparently timeout-minutes only accepts literal values, it cannot evaluate expressions (e.g. workflow inputs)
+
+      - name: Pulumi Up
+        uses: ./.github/actions/pulumi_ephemeral_deploy
+        if: ${{ inputs.PULUMI_UP }}
+        with:
+          project-dir: "."
+          deploy-script-module-name: ${{ inputs.DEPLOY_SCRIPT_MODULE_NAME }}
+          stack-name: ${{ inputs.PULUMI_STACK_NAME }}
+          aws-role-name: ${{ inputs.PULUMI_UP_ROLE_NAME }}
+          deploy-script-name: ${{ inputs.DEPLOY_SCRIPT_NAME }}
+          aws-region: us-east-1
+          aws-account-id: ${{ inputs.AWS_ACCOUNT_ID }}
+          cli-action: "--apply"

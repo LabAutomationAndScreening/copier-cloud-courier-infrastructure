@@ -1,0 +1,42 @@
+{% raw %}[project]
+name = "cloud-courier-infrastructure"
+version = "0.1.0"
+description = "Managing the Cloud Infrastructure for a Cloud Courier deployment"
+
+readme = "README.md"
+requires-python = ">={% endraw %}{{ python_version }}{% raw %}"
+
+dependencies = [
+    # Specific to this template
+
+
+
+    # Managed by upstream template
+    "pulumi>={% endraw %}{{ pulumi_version }}{% raw %}",
+    "pulumi-aws>={% endraw %}{{ pulumi_aws_version }}{% raw %}",
+    "pulumi-aws-native>={% endraw %}{{ pulumi_aws_native_version }}{% raw %}",
+    "pulumi-command>={% endraw %}{{ pulumi_command_version }}{% raw %}",
+    "ephemeral-pulumi-deploy>={% endraw %}{{ ephemeral_pulumi_deploy_version }}{% raw %}",
+    "boto3>={% endraw %}{{ boto3_version }}{% raw %}",
+    "pydantic>={% endraw %}{{ pydantic_version }}{% raw %}",
+]
+
+
+[dependency-groups]
+dev = [
+    # Specific to this template
+
+
+
+    # Managed by upstream template
+    "pyright>={% endraw %}{{ pyright_version }}{% raw %}",
+    "pytest>={% endraw %}{{ pytest_version }}{% raw %}",
+    "pytest-cov>={% endraw %}{{ pytest_cov_version }}{% raw %}",
+    "pytest-randomly>={% endraw %}{{ pytest_randomly_version }}{% raw %}",
+    "boto3-stubs[all]>={% endraw %}{{ boto3_version }}{% raw %}",
+]
+
+
+
+[tool.uv]
+package = false{% endraw %}

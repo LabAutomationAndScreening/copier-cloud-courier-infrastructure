@@ -1,0 +1,26 @@
+{% raw %}#!/usr/bin/env sh
+set -ex
+
+mkdir -p ~/.aws
+cat >> ~/.aws/config <<EOF
+[profile development]
+sso_session = org
+sso_account_id = {% endraw %}{{ aws_development_account_id if use_staging_environment else aws_production_account_id }}{% raw %}
+sso_role_name = LowRiskAccountAdminAccess
+region = {% endraw %}{{ aws_org_home_region }}{% raw %}
+
+[sso-session org]
+sso_start_url = https://{% endraw %}{{ aws_identity_center_id }}{% raw %}.awsapps.com/start
+sso_region = {% endraw %}{{ aws_org_home_region }}{% raw %}
+sso_registration_scopes = sso:account:access
+
+[profile localstack]
+region={% endraw %}{{ aws_org_home_region }}{% raw %}
+output=json
+endpoint_url = http://localstack:4566
+EOF
+cat >> ~/.aws/credentials <<EOF
+[localstack]
+aws_access_key_id=test
+aws_secret_access_key=test
+EOF{% endraw %}

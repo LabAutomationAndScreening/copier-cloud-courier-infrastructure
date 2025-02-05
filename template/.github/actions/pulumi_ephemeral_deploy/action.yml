@@ -1,0 +1,79 @@
+name: Pulumi ephemeral deploy
+description: Setup Pulumi and run the ephemeral deploy CLI
+inputs:
+  project-dir:
+    type: string
+    description: What's the relative path to the project from the root (start with directory and don't end in slash)?
+    required: true
+  deploy-script-module-name:
+    type: string
+    description: What's the name of the module that the deploy script is in (snake case)?
+    required: true
+  deploy-script-name:
+    type: string
+    description: What's the name of the deploy script?
+    required: false
+    default: pulumi_deploy
+  stack-name:
+    type: string
+    description: What's the Pulumi Stack name?
+    required: true
+  cli-action:
+    type: string
+    description: What's the Pulumi Ephemeral CLI action?
+    required: false
+    default: ''
+  aws-account-id:
+    type: string
+    description: What's the AWS Account ID for the role to assume?
+    required: true
+  aws-role-name:
+    type: string
+    description: What's the AWS role name?
+    required: false
+  aws-region:
+    type: string
+    description: What's the AWS region to assume the role in?
+    required: false
+    default: us-east-1
+  install-pulumi:
+    type: boolean
+    default: true
+    required: false
+    description: Whether or not to install the Pulumi CLI
+
+
+
+
+runs:
+  using: composite
+  steps:
+    - name: Delete original runner Pulumi and add new installation location to PATH
+      # delete the built-in pulumi installation as it appears to interfere with caching and using the version specified in the requirements file
+      run: |
+        rm /usr/local/bin/pulumi -f
+        echo "$HOME/.pulumi/bin" >> $GITHUB_PATH
+      shell: bash
+
+    - name: Install Pulumi
+      if: ${{ inputs.install-pulumi }}
+      run: sh .devcontainer/install-pulumi-cli.sh ${{ github.workspace }}/${{ inputs.project-dir }}/uv.lock
+      shell: bash
+
+    - name: List Pulumi Info
+      run: |
+        whereis pulumi
+        pulumi version
+        pulumi plugin ls
+      shell: bash
+
+    - name: AWS OIDC
+      uses: aws-actions/configure-aws-credentials@v4.0.2
+      with:
+        role-to-assume: arn:aws:iam::${{ inputs.aws-account-id }}:role/${{ inputs.aws-role-name }}
+        aws-region: ${{ inputs.aws-region }}
+
+    - name: Run CLI
+      working-directory: ${{ github.workspace }}/${{ inputs.project-dir }}
+      run: uv run python -m ${{ inputs.deploy-script-module-name }}.${{ inputs.deploy-script-name }} --stack=${{ inputs.stack-name }} ${{ inputs.cli-action }}
+      shell: bash
