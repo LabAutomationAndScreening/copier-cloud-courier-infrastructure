@@ -6,7 +6,8 @@
 
 
 
-
+# Using Pulumi
+Run a Pulumi Preview: `uv run python -m cloud_courier_infrastructure.pulumi_deploy --stack=dev`
 
 ## Updating from the template
 This repository uses a copier template. To pull in the latest updates from the template, use the command:
