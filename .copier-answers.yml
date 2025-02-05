@@ -1,0 +1,13 @@
+# Changes here will be overwritten by Copier
+_commit: v0.0.5-43-gc79bb93
+_src_path: gh:LabAutomationAndScreening/copier-base-template.git
+description: Infrastructure for Cloud Courier
+python_ci_versions:
+- 3.12.7
+- 3.13.1
+python_version: 3.12.7
+repo_name: copier-cloud-courier-infrastructure
+ssh_port_number: 52369
+template_uses_pulumi: true
+template_uses_python: true
+

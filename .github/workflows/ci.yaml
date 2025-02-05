@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - 'gh-readonly-queue/**' # don't run (again) when on these special branches created during merge groups; the `on: merge_group` already triggers it.
+  merge_group:
+
+env:
+  PYTHONUNBUFFERED: True
+  PRE_COMMIT_HOME: ${{ github.workspace }}/.precommit_cache
+
+permissions:
+    id-token: write
+    contents: write # needed for mutex
+
+jobs:
+  pre-commit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - "ubuntu-24.04"
+        python-version:
+            - 3.12.7
+    name: Pre-commit for Py${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: Install latest versions of python packages
+        uses: ./.github/actions/install_deps_uv
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
+        if: ${{ runner.os != 'Windows' }} # we're just gonna have to YOLO on Windows, because this action doesn't support it yet https://github.com/ben-z/gh-action-mutex/issues/14
+        uses: ben-z/gh-action-mutex@d3d5b354d460d4b6a1e3ee5b7951678658327812 # v1.0.0-alpha.9
+        with:
+          branch: mutex-venv-${{ matrix.os }}-${{ matrix.python-version }}
+        timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
+
+      - name: Cache Pre-commit hooks
+        uses: actions/cache@v4.2.0
+        env:
+          cache-name: cache-pre-commit-hooks
+        with:
+          path: ${{ env.PRE_COMMIT_HOME }}
+          key: ${{ matrix.os }}-${{ matrix.python-version }}-build-${{ env.cache-name }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.python-version }}-build-${{ env.cache-name }}-
+
+      - name: Run pre-commit
+        run:  pre-commit run -a
+
+  lint-matrix:
+    needs: [ pre-commit ]
+    strategy:
+      matrix:
+        os:
+          - "ubuntu-24.04"
+        python-version:
+
+          - 3.12.7
+
+          - 3.13.1
+
+        copier: [
+          '--data-file tests/copier_data/data1.yaml',
+          '--data-file tests/copier_data/data2.yaml',
+          ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: Install python tooling
+        uses: ./.github/actions/install_deps_uv
+        with:
+          python-version: ${{ matrix.python-version }}
+          uv-sync: false
+
+      - name: Instantiate copier template
+        run: |
+          copier copy --trust --vcs-ref ${{ github.sha }} ${{ matrix.copier }} --data python_version=${{ matrix.python-version }} . ./new-template
+      - name: Delete files from initial repo
+        run: |
+          # Delete everything except the folder containing the instantiated template
+          # https://stackoverflow.com/questions/34057047/delete-all-directories-except-one
+          shopt -s extglob
+          rm -rf !(new-template)
+          rm -rf .github # apparently this folder doesn't get removed with the previous command for some reason
+          rm -rf .devcontainer # apparently this folder doesn't get removed with the previous command for some reason
+          ls -la
+      - name: Move the instantiated template into the repo root
+        run: |
+          # Move all the files from the instantiated template out of the subfolder
+          shopt -s dotglob # https://unix.stackexchange.com/questions/6393/how-do-you-move-all-files-including-hidden-from-one-directory-to-another
+          mv new-template/* .
+          ls -la
+          # delete the subfolder
+          rm -frd new-template
+          ls -la
+
+
+      - name: install new dependencies
+        run: |
+          sh .devcontainer/manual-setup-deps.sh ${{ matrix.python-version }} --skip-lock
+          # Add everything to git so that pre-commit recognizes the files and runs on them
+          git add .
+          git status
+
+      - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
+        if: ${{ runner.os != 'Windows' }} # we're just gonna have to YOLO on Windows, because this action doesn't support it yet https://github.com/ben-z/gh-action-mutex/issues/14
+        uses: ben-z/gh-action-mutex@d3d5b354d460d4b6a1e3ee5b7951678658327812 # v1.0.0-alpha.9
+        with:
+          branch: mutex-venv-${{ matrix.os }}-${{ matrix.python-version }}
+        timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
+
+      - name: Cache Pre-commit hooks
+        uses: actions/cache@v4.2.0
+        env:
+          cache-name: cache-pre-commit-hooks
+        with:
+          path: ${{ env.PRE_COMMIT_HOME }}
+          key: ${{ matrix.os }}-${{ matrix.python-version }}-build-${{ env.cache-name }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.python-version }}-build-${{ env.cache-name }}-
+
+      - name: Run pre-commit
+        run: |
+          # skip pip-compile because the command line args in the header are different
+          SKIP=git-dirty pre-commit run -a
+
+      - name: Upload pre-commit log if failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4.4.3
+        with:
+          name: pre-commit-log--${{ github.jobs.lint-matrix.name }}
+          path: "${{ github.workspace }}/.precommit_cache/pre-commit.log"
+
+  required-check:
+    runs-on: ubuntu-24.04
+    needs: [ lint-matrix ]
+    if: always()
+    steps:
+      - name: fail if prior job failure
+        if: needs.lint-matrix.result != 'success'
+        run: |
+          exit 1
