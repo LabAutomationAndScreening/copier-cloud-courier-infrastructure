@@ -117,13 +117,14 @@ jobs:
     needs: [ get-values, lint, ephemeral-test, pulumi-staging, pulumi-prod ]
     if: always()
     steps:
-      - name: fail if prior job failure
-        if: needs.lint.result != 'success' || needs.pulumi-staging.result != 'success' || (needs.get-values.result != 'success' && needs.get-values.result != 'skipped') || (needs.ephemeral-test.result != 'success' && needs.ephemeral-test.result != 'skipped') || (needs.pulumi-prod.result != 'success' && needs.pulumi-prod.result != 'skipped')
+      - name: Show job status
         run: |
           echo ${{ needs.lint.result }}
           echo ${{ needs.pulumi-staging.result }}
           echo ${{ needs.get-values.result }}
           echo ${{ needs.ephemeral-test.result }}
           echo ${{ needs.pulumi-prod.result }}
-          echo "One of the prior jobs failed. Exiting."
+      - name: fail if prior job failure
+        if: needs.lint.result != 'success' || needs.pulumi-staging.result != 'success' || (needs.get-values.result != 'success' && needs.get-values.result != 'skipped') || (needs.ephemeral-test.result != 'success' && needs.ephemeral-test.result != 'skipped') || (needs.pulumi-prod.result != 'success' && needs.pulumi-prod.result != 'skipped')
+        run: |
           exit 1{% endraw %}
