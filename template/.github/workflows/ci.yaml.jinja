@@ -1,0 +1,71 @@
+{% raw %}name: CI
+
+on:
+  push:
+    branches-ignore:
+      - 'gh-readonly-queue/**' # don't run (again) when on these special branches created during merge groups; the `on: merge_group` already triggers it.
+  merge_group:
+
+env:
+  PYTHONUNBUFFERED: True
+  PRE_COMMIT_HOME: ${{ github.workspace }}/.precommit_cache
+
+permissions:
+    id-token: write
+    contents: write # needed for mutex
+
+jobs:
+  lint:
+    name: Pre-commit
+    runs-on: {% endraw %}{{ gha_linux_runner }}{% raw %}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@{% endraw %}{{ gha_checkout }}{% raw %}
+
+      - name: Install latest versions of python packages
+        uses: ./.github/actions/install_deps_uv
+        with:
+          python-version: {% endraw %}{{ python_version }}{% raw %}
+
+      - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
+        if: ${{ runner.os != 'Windows' }} # we're just gonna have to YOLO on Windows, because this action doesn't support it yet https://github.com/ben-z/gh-action-mutex/issues/14
+        uses: ben-z/gh-action-mutex@{% endraw %}{{ gha_mutex }}{% raw %}
+        with:
+          branch: mutex-venv-{% endraw %}{{ gha_linux_runner }}{% raw %}-py{% endraw %}{{ python_version }}{% raw %}
+        timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
+
+      - name: Cache Pre-commit hooks
+        uses: actions/cache@{% endraw %}{{ gha_cache }}{% raw %}
+        env:
+          cache-name: cache-pre-commit-hooks
+        with:
+          path: ${{ env.PRE_COMMIT_HOME }}
+          key: {% endraw %}{{ gha_linux_runner }}{% raw %}-py{% endraw %}{{ python_version }}{% raw %}-build-${{ env.cache-name }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            {% endraw %}{{ gha_linux_runner }}{% raw %}-py{% endraw %}{{ python_version }}{% raw %}-build-${{ env.cache-name }}-
+
+      - name: Run pre-commit
+        run:  pre-commit run -a
+
+  staging-preview:
+    uses: ./.github/workflows/pulumi-aws.yml
+    needs: [ lint ]
+    with:
+      AWS_REGION: {% endraw %}{{ aws_region_for_stack }}{% raw %}
+      PULUMI_STACK_NAME: prod
+      PYTHON_VERSION: {% endraw %}{{ python_version }}{% raw %}
+      DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure
+      PULUMI_PREVIEW: true
+      PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
+      AWS_ACCOUNT_ID: "{% endraw %}{{ aws_staging_account_id }}{% raw %}"
+
+
+  required-check:
+    runs-on: {% endraw %}{{ gha_linux_runner }}{% raw %}
+    needs: [ lint, staging-preview ]
+    if: always()
+    steps:
+      - name: fail if prior job failure
+        if: needs.lint.result != 'success' || needs.staging-preview.result != 'success'
+        run: |
+          exit 1{% endraw %}
