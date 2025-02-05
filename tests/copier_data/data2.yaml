@@ -11,6 +11,7 @@ use_staging_environment: true
 aws_staging_account_id: 210987654321
 aws_test_account_id: 211735654321
 aws_development_account_id: 000321456870
+aws_region_for_stack: us-west-1
 
 
 

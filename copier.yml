@@ -56,6 +56,11 @@ aws_development_account_id:
     help: What's the AWS Account ID for local development (often the same as the ephemeral test environment)?
     when: "{{ use_staging_environment }}"
 
+aws_region_for_stack:
+    type: str
+    help: What AWS region should be used for this workload?
+    default: "{{ aws_org_home_region }}"
+
 
 
 # Questions specific to this template
