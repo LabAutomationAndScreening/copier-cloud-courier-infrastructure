@@ -74,11 +74,12 @@ jobs:
     needs: [ lint, get-values ]
     with:
       AWS_REGION: {% endraw %}{{ aws_region_for_stack }}{% raw %}
-      PULUMI_STACK_NAME: test # TODO: make this related to the PR name
+      PULUMI_STACK_NAME: test-${{ needs.get-values.outputs.pr-short-num }}
       PYTHON_VERSION: {% endraw %}{{ python_version }}{% raw %}
       DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure
       PULUMI_PREVIEW: true
       PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
+      PULUMI_DESTROY: true
       AWS_ACCOUNT_ID: "{% endraw %}{{ aws_test_account_id }}{% raw %}"
 
   pulumi-staging:
