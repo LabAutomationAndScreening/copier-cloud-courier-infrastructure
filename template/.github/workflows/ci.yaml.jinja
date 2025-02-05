@@ -5,6 +5,7 @@ on:
     branches-ignore:
       - 'gh-readonly-queue/**' # don't run (again) when on these special branches created during merge groups; the `on: merge_group` already triggers it.
   merge_group:
+  pull_request:
 
 env:
   PYTHONUNBUFFERED: True
