@@ -1,5 +1,5 @@
 # Changes here will be overwritten by Copier
-_commit: v0.0.5-47-gf9983fe
+_commit: v0.0.5-48-g7eef4e3
 _src_path: gh:LabAutomationAndScreening/copier-base-template.git
 description: Infrastructure for Cloud Courier
 python_ci_versions:
