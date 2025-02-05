@@ -117,7 +117,7 @@ jobs:
     if: always()
     steps:
       - name: fail if prior job failure
-        if: needs.lint.result != 'success' || needs.pulumi-staging.result != 'success' || needs.get-values.result != 'success' || needs.ephemeral-test.result != 'success' || needs.pulumi-prod.result != 'success'
+        if: needs.lint.result != 'success' || needs.pulumi-staging.result != 'success' || (needs.get-values.result != 'success' && needs.get-values.result != 'skipped') || (needs.ephemeral-test.result != 'success' && needs.ephemeral-test.result != 'skipped') || (needs.pulumi-prod.result != 'success' && needs.pulumi-prod.result != 'skipped')
         run: |
           echo ${{ needs.lint.result }}
           echo ${{ needs.pulumi-staging.result }}
