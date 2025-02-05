@@ -70,6 +70,7 @@ jobs:
 
   ephemeral-test:
     uses: ./.github/workflows/pulumi-aws.yml
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     needs: [ lint, get-values ]
     with:
       AWS_REGION: {% endraw %}{{ aws_region_for_stack }}{% raw %}
