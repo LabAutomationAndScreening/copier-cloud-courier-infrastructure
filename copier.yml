@@ -22,14 +22,6 @@ python_version:
     help: What version of Python is used for development?
     default: "3.12.7"
 
-python_ci_versions:
-    type: str
-    help: What versions should Python run CI on the instantiated template?
-    multiselect: true
-    choices:
-      - "3.12.7"
-      - "3.13.1"
-
 
 aws_identity_center_id:
     type: str
