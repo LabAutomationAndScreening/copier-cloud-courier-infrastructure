@@ -55,6 +55,7 @@ aws_development_account_id:
     type: str
     help: What's the AWS Account ID for local development (often the same as the ephemeral test environment)?
     when: "{{ use_staging_environment }}"
+    default: "{{ aws_test_account_id }}"
 
 aws_region_for_stack:
     type: str
