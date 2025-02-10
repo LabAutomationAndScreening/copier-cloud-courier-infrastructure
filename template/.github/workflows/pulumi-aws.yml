@@ -112,7 +112,7 @@ jobs:
           deploy-script-name: ${{ inputs.DEPLOY_SCRIPT_NAME }}
           aws-region: ${{ inputs.AWS_REGION }}
           aws-account-id: ${{ inputs.AWS_ACCOUNT_ID }}
-          cli-action: "--apply"
+          cli-action: "--up"
 
       - name: Pulumi Final Destroy
         uses: ./.github/actions/pulumi_ephemeral_deploy
