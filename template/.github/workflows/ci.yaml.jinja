@@ -81,6 +81,7 @@ jobs:
       PULUMI_PREVIEW: true
       PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
       PULUMI_UP_ROLE_NAME: InfraDeploy--{% endraw %}{{ repo_name }}{% raw %}
+      PULUMI_UP: true
       PULUMI_DESTROY: true
       AWS_ACCOUNT_ID: "{% endraw %}{{ aws_test_account_id }}{% raw %}"
 
