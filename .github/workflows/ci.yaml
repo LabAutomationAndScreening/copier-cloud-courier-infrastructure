@@ -64,6 +64,8 @@ jobs:
 
           - 3.12.7
 
+          - 3.13.1
+
         copier: [
           '--data-file tests/copier_data/data1.yaml',
           '--data-file tests/copier_data/data2.yaml',
