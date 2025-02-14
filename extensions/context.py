@@ -12,7 +12,7 @@ class ContextUpdater(ContextHook):
     def hook(self, context: dict[Any, Any]) -> dict[Any, Any]:
         context["uv_version"] = "0.5.28"
         context["pre_commit_version"] = "4.0.1"
-        context["pyright_version"] = "1.1.393"
+        context["pyright_version"] = "1.1.394"
         context["pytest_version"] = "8.3.4"
         context["pytest_randomly_version"] = "3.16.0"
         context["pytest_cov_version"] = "6.0.0"
@@ -26,6 +26,7 @@ class ContextUpdater(ContextHook):
         context["boto3_version"] = "1.36.3"
         context["ephemeral_pulumi_deploy_version"] = "0.0.2"
         context["pydantic_version"] = "2.10.6"
+        context["pyinstaller_version"] = "6.12.0"
 
         context["gha_checkout"] = "v4.2.2"
         context["gha_setup_python"] = "v5.3.0"
