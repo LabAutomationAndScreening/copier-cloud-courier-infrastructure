@@ -1,5 +1,6 @@
 # Data managed by upstream template
 repo_name: the_best_repo
+repo_org_name: great-company
 description: Doing amazing things
 ssh_port_number: 12345
 use_windows_in_ci: false

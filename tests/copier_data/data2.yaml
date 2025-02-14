@@ -1,5 +1,6 @@
 # Data managed by upstream template
 repo_name: another_repo
+repo_org_name: initech
 description: Doing crazy things! So many things!
 ssh_port_number: 54321
 use_windows_in_ci: true

@@ -75,6 +75,19 @@ jobs:
           branch: mutex-pulumi-${{ inputs.PULUMI_STACK_NAME }}
         timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
 
+      - name: Pulumi Initial Destroy to cleanup any leftovers
+        uses: ./.github/actions/pulumi_ephemeral_deploy
+        if: ${{ inputs.PULUMI_DESTROY }}
+        with:
+          project-dir: "."
+          deploy-script-module-name: ${{ inputs.DEPLOY_SCRIPT_MODULE_NAME }}
+          stack-name: ${{ inputs.PULUMI_STACK_NAME }}
+          aws-role-name: ${{ inputs.PULUMI_UP_ROLE_NAME }}
+          deploy-script-name: ${{ inputs.DEPLOY_SCRIPT_NAME }}
+          aws-region: ${{ inputs.AWS_REGION }}
+          aws-account-id: ${{ inputs.AWS_ACCOUNT_ID }}
+          cli-action: "--destroy"
+
       - name: Preview
         uses: ./.github/actions/pulumi_ephemeral_deploy
         if: ${{ inputs.PULUMI_PREVIEW }}
@@ -84,7 +97,7 @@ jobs:
           stack-name: ${{ inputs.PULUMI_STACK_NAME }}
           aws-role-name: ${{ inputs.PREVIEW_ROLE_NAME }}
           deploy-script-name: ${{ inputs.DEPLOY_SCRIPT_NAME }}
-          aws-region: us-east-1
+          aws-region: ${{ inputs.AWS_REGION }}
           aws-account-id: ${{ inputs.AWS_ACCOUNT_ID }}
         timeout-minutes: 5 # apparently timeout-minutes only accepts literal values, it cannot evaluate expressions (e.g. workflow inputs)
 
@@ -97,6 +110,19 @@ jobs:
           stack-name: ${{ inputs.PULUMI_STACK_NAME }}
           aws-role-name: ${{ inputs.PULUMI_UP_ROLE_NAME }}
           deploy-script-name: ${{ inputs.DEPLOY_SCRIPT_NAME }}
-          aws-region: us-east-1
+          aws-region: ${{ inputs.AWS_REGION }}
           aws-account-id: ${{ inputs.AWS_ACCOUNT_ID }}
-          cli-action: "--apply"
+          cli-action: "--up"
+
+      - name: Pulumi Final Destroy
+        uses: ./.github/actions/pulumi_ephemeral_deploy
+        if: ${{ inputs.PULUMI_DESTROY }}
+        with:
+          project-dir: "."
+          deploy-script-module-name: ${{ inputs.DEPLOY_SCRIPT_MODULE_NAME }}
+          stack-name: ${{ inputs.PULUMI_STACK_NAME }}
+          aws-role-name: ${{ inputs.PULUMI_UP_ROLE_NAME }}
+          deploy-script-name: ${{ inputs.DEPLOY_SCRIPT_NAME }}
+          aws-region: ${{ inputs.AWS_REGION }}
+          aws-account-id: ${{ inputs.AWS_ACCOUNT_ID }}
+          cli-action: "--destroy"

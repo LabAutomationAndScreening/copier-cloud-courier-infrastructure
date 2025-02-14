@@ -3,6 +3,10 @@ repo_name:
     type: str
     help: What is the name of the repository?
 
+repo_org_name:
+    type: str
+    help: What's the organization or username that owns this repository (look in the URL)?
+
 description:
     type: str
     help: What is the description of this repository?

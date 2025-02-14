@@ -15,6 +15,7 @@ services:
       - "{% endraw %}{{ ssh_port_number }}{% raw %}:2222"
     environment:
       - AWS_PROFILE=localstack
+      - AWS_DEFAULT_REGION={% endraw %}{{ aws_region_for_stack }}{% raw %}
 
 
 volumes:
