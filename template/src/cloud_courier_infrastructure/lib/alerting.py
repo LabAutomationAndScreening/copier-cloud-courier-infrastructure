@@ -1,6 +1,7 @@
 import math
 from typing import Any
 
+import pulumi_aws
 from ephemeral_pulumi_deploy import append_resource_suffix
 from ephemeral_pulumi_deploy import common_tags_native
 from pulumi import ComponentResource
@@ -106,7 +107,7 @@ class Dashboard(ComponentResource):
                     ],
                     "period": 60,
                     "stat": "Sum",
-                    "region": "us-east-1",  # Update to your region.
+                    "region": pulumi_aws.config.region,
                     "title": f"Heartbeat for {node_alert.lab_computer_config.name} at {node_alert.lab_computer_config.location.name}",
                 },
             }
