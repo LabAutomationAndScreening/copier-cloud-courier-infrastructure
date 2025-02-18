@@ -17,3 +17,4 @@ aws_region_for_stack: us-west-1
 
 
 # Data added based on the specifics of this template
+create_private_distributor_installation_packaged: false
