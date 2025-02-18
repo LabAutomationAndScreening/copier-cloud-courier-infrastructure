@@ -4,13 +4,13 @@ from ephemeral_pulumi_deploy import get_aws_account_id
 from ephemeral_pulumi_deploy import get_config
 from pulumi import export
 
-from .computers import create_all_computer_configs
-from .lib import CloudCourierSsmCommands
-from .lib import Dashboard
-from .lib import NodeAlert
-from .lib import OnPremNode
-from .lib import RawDataBucket
-from .lib import SsmLogsBucket
+from ..computers import create_all_computer_configs
+from . import CloudCourierSsmCommands
+from . import Dashboard
+from . import NodeAlert
+from . import OnPremNode
+from . import RawDataBucket
+from . import SsmLogsBucket
 
 logger = logging.getLogger(__name__)
 
