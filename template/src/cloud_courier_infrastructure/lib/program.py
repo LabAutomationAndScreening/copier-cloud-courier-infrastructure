@@ -5,12 +5,15 @@ from ephemeral_pulumi_deploy import get_config
 from pulumi import export
 
 from ..computers import create_all_computer_configs
+from . import CloudCourierAgentInstaller
 from . import CloudCourierSsmCommands
 from . import Dashboard
+from . import DistributorFileToPackage
 from . import NodeAlert
 from . import OnPremNode
 from . import RawDataBucket
 from . import SsmLogsBucket
+from .constants import CREATE_DISTRIBUTOR_PACKAGE
 
 logger = logging.getLogger(__name__)
 
@@ -38,3 +41,13 @@ def pulumi_program() -> None:
         )
         all_node_alerts.append(NodeAlert(lab_computer_config=computer_config))
     _ = Dashboard(node_alerts=all_node_alerts)
+    if CREATE_DISTRIBUTOR_PACKAGE:
+        _ = CloudCourierAgentInstaller(
+            version="0.0.3",
+            files_to_package=[
+                DistributorFileToPackage(
+                    source_path="s3://manual-artifacts--artifact-stores--prod-82ba004/cloud-courier/v0.0.3/exe-windows-2022-3.12.7.zip",
+                    local_name="exe-v0.0.3.zip",
+                )
+            ],
+        )
