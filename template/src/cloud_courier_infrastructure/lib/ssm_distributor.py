@@ -111,12 +111,15 @@ def download_s3_file(*, file_to_package: DistributorFileToPackage, local_file_di
 
 
 class CloudCourierAgentInstaller(ComponentResource):
-    def __init__(self, *, files_to_package: list[DistributorFileToPackage], version: str):
+    def __init__(
+        self, *, files_to_package: list[DistributorFileToPackage], version: str, download_exe_from_github: bool = False
+    ):
         super().__init__(
             "labauto:cloud-courier-agent-package",
             append_resource_suffix(),
             None,
         )
+        del download_exe_from_github
         self._files_to_package = files_to_package
         self._task_name = "CloudCourierUploadAgent"
         package_base_name = "cloud-courier-agent"
