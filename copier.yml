@@ -70,10 +70,10 @@ aws_region_for_stack:
 
 # Questions specific to this template
 
-create_private_distributor_installation_packaged:
+automatically_obtain_executable_from_github:
     type: bool
-    help: Do you want to create your own private SSM Distributor Package to install the Cloud Courier Agent (instead of just using the public one)?
-    default: no
+    help: Do you want to automatically download the Cloud Courier Agent executable from Github Releases (vs manually upload it into an S3 bucket yourself)?
+    default: yes
 
 # Additional Settings
 _min_copier_version: "9.4"

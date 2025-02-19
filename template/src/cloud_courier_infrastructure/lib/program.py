@@ -13,7 +13,7 @@ from . import NodeAlert
 from . import OnPremNode
 from . import RawDataBucket
 from . import SsmLogsBucket
-from .constants import CREATE_DISTRIBUTOR_PACKAGE
+from .constants import DOWNLOAD_EXE_FROM_GITHUB
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def pulumi_program() -> None:
         )
         all_node_alerts.append(NodeAlert(lab_computer_config=computer_config))
     _ = Dashboard(node_alerts=all_node_alerts)
-    if CREATE_DISTRIBUTOR_PACKAGE:
+    if DOWNLOAD_EXE_FROM_GITHUB:
         _ = CloudCourierAgentInstaller(
             version="0.0.3",
             files_to_package=[
