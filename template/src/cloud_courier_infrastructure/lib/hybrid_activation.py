@@ -27,6 +27,16 @@ from .models import LabComputerConfig
 logger = logging.getLogger(__name__)
 
 
+def create_output_if_needed(*, has_been_activated: bool, original_resource_name: str, activation: Activation):
+    if not has_been_activated:
+        export(
+            f"-{original_resource_name}-activation-script",
+            Output.all(activation.id, activation.activation_code).apply(
+                lambda args: _generate_activation_script_contents(*args)
+            ),
+        )
+
+
 def _generate_activation_script_contents(
     activation_id: str,
     activation_code: str,
@@ -175,11 +185,17 @@ class OnPremNode(ComponentResource):
         )
         fixed_tags = common_tags()  # changes to the tags of the Activation will trigger replacement
         fixed_tags["original-computer-info"] = original_resource_name
+        fixed_tags["installed-cloud-courier-agent-version"] = ""
         activation = Activation(
             immutable_resource_name,
-            description=f"For the computer: {resource_name}.",
+            description=f"For the computer originally named: {original_resource_name}.",
             iam_role=role.id,
-            opts=ResourceOptions(parent=self),
+            opts=ResourceOptions(
+                parent=self,
+                ignore_changes=[
+                    "tags"
+                ],  # since the SSM Distributor Package will update the installed-cloud-courier-agent-version tag, we need to ignore changes to tags here
+            ),
             registration_limit=1,
             tags=fixed_tags,
             name=original_resource_name,
@@ -224,20 +240,8 @@ class OnPremNode(ComponentResource):
                 ),
             ],
         ).apply(lambda result: len(result.ids) > 0)
-        if not has_been_activated:
-            export(
-                f"-{original_resource_name}-activation-script",
-                Output.all(activation.id, activation.activation_code).apply(
-                    lambda args: _generate_activation_script_contents(*args)
-                ),
+        _ = has_been_activated.apply(
+            lambda been_activated: create_output_if_needed(  # it's a general anti-pattern to create resources inside an apply statement...but this is just a stack output, and I couldn't think of any other way
+                has_been_activated=been_activated, original_resource_name=original_resource_name, activation=activation
             )
-
-    def has_been_activated(self) -> bool:
-        _ = get_instances_output(
-            filters=[
-                GetInstancesFilterArgs(name="ResourceType", values=["ManagedInstance"]),
-                GetInstancesFilterArgs(name="tag-key", values=["Key=original-computer-info,Values="]),
-            ],
-        ).apply(lambda x: logger.critical(repr(x.ids)))
-
-        return True
+        )
