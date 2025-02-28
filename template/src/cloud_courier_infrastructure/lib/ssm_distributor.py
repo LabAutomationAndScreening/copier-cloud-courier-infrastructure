@@ -119,7 +119,7 @@ class CloudCourierAgentInstaller(ComponentResource):
             append_resource_suffix(),
             None,
         )
-        del download_exe_from_github
+        del download_exe_from_github  # TODO: implement this if the requested version is not present in S3 already
         self._files_to_package = files_to_package
         self._task_name = "CloudCourierUploadAgent"
         package_base_name = "cloud-courier-agent"
@@ -243,21 +243,19 @@ class CloudCourierAgentInstaller(ComponentResource):
                     $arguments = "--aws-region={pulumi_aws.config.region} --stop-flag-dir=$stopFlagDir --log-folder=$logsDir --no-console-logging"
 
                     # Build the command string.
-                    # Using cmd.exe /c start /low launches the program with low CPU priority.
-                    # The empty quotes after start represent the window title.
-                    # When run as a scheduled task with "Run whether user is logged on or not",
-                    # the process will not display a window.
+                    # This command uses tasklist and find to check if cloud-courier.exe is already running.
+                    # If not found, it launches the executable with low CPU priority.
                     $command = "cmd.exe"
-                    $cmdArguments = '/c start /low "" "' + $exePath + '" ' + $arguments
+                    $cmdArguments = '/c "tasklist /FI \"IMAGENAME eq cloud-courier.exe\" | find /I \"cloud-courier.exe\" >nul || start /low "" "' + $exePath + '" ' + $arguments + '"'
 
                     # Create the scheduled task action that embeds the command directly
                     $action = New-ScheduledTaskAction -Execute $command -Argument $cmdArguments
 
                     # Create a trigger to run the task at system startup
-                    $trigger = New-ScheduledTaskTrigger -AtStartup
+                    $trigger = New-ScheduledTaskTrigger -AtLogon
 
                     # Register the scheduled task. Running under the SYSTEM account (or with highest privileges)
-                    # ensures that it runs without a window even if no user is logged on.
+                    # ensures that it runs without a window.
                     Register-ScheduledTask -TaskName "{self._task_name}" -Action $action -Trigger $trigger -RunLevel Highest -User "SYSTEM" -Force
 
                     Write-Host "Scheduled task '{self._task_name}' created successfully."
