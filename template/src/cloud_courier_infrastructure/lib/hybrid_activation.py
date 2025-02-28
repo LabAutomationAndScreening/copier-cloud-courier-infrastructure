@@ -4,6 +4,7 @@ import pulumi_aws
 from ephemeral_pulumi_deploy import append_resource_suffix
 from ephemeral_pulumi_deploy import common_tags
 from ephemeral_pulumi_deploy import common_tags_native
+from ephemeral_pulumi_deploy import get_aws_account_id
 from pulumi import ComponentResource
 from pulumi import Output
 from pulumi import ResourceOptions
@@ -159,6 +160,36 @@ class OnPremNode(ComponentResource):
             ).json,
             opts=ResourceOptions(parent=role),
         )
+        original_computer_info_tag_key = "original-computer-info"
+        installed_agent_version_tag_key = "installed-cloud-courier-agent-version"
+        _ = RolePolicy(  # the native provider gave some odd CloudControl error about the policy, even though it has no Outputs in it
+            append_resource_suffix(f"{resource_name}-update-instance-tag", max_length=100),
+            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            name="update-instance-tag",
+            policy=get_policy_document(
+                statements=[
+                    GetPolicyDocumentStatementArgs(
+                        sid="UpdateInstanceTag",
+                        effect="Allow",
+                        actions=["ssm:AddTagsToResource"],
+                        resources=[f"arn:aws:ssm:{pulumi_aws.config.region}:{get_aws_account_id()}:managed-instance/*"],
+                        conditions=[
+                            GetPolicyDocumentStatementConditionArgs(
+                                test="StringEquals",
+                                variable=f"aws:ResourceTag/{original_computer_info_tag_key}",
+                                values=[original_resource_name],
+                            ),
+                            GetPolicyDocumentStatementConditionArgs(
+                                test="ForAllValues:StringEquals",
+                                variable="aws:TagKeys",
+                                values=[installed_agent_version_tag_key],
+                            ),
+                        ],
+                    ),
+                ]
+            ).json,
+            opts=ResourceOptions(parent=role),
+        )
         _ = RolePolicy(  # the native provider has some CloudControl error when the policy document had an output in it
             append_resource_suffix(f"{resource_name}-create-ssm-logs", max_length=100),
             role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
@@ -184,9 +215,9 @@ class OnPremNode(ComponentResource):
             opts=ResourceOptions(parent=role),
         )
         fixed_tags = common_tags()  # changes to the tags of the Activation will trigger replacement
-        fixed_tags["original-computer-info"] = original_resource_name
-        fixed_tags["installed-cloud-courier-agent-version"] = (
-            "uninstalled"  # leaving it blank doesn't let you use it as a filter for SSM Command targeting
+        fixed_tags[original_computer_info_tag_key] = original_resource_name
+        fixed_tags[installed_agent_version_tag_key] = (
+            "N/A"  # leaving it blank doesn't let you use it as a filter for SSM Command targeting
         )
         activation = Activation(
             immutable_resource_name,
@@ -196,7 +227,7 @@ class OnPremNode(ComponentResource):
                 parent=self,
                 ignore_changes=[
                     "tags"
-                ],  # since the SSM Distributor Package will update the installed-cloud-courier-agent-version tag, we need to ignore changes to tags here
+                ],  # since the Cloud Courier Agent will update the installed-cloud-courier-agent-version tag, we need to ignore changes to tags here # TODO: consider if there's a way for the Distributor Package to update it directly...but that seems like it might require installing the AWS CLI on the computer
             ),
             registration_limit=1,
             tags=fixed_tags,
@@ -232,15 +263,16 @@ class OnPremNode(ComponentResource):
                 tags=common_tags(),
                 opts=ResourceOptions(parent=self, delete_before_replace=True),
             )
-        has_been_activated = get_instances_output(
-            filters=[
-                GetInstancesFilterArgs(
-                    name="tag-key",
-                    values=[
-                        f"Key=original-computer-info,Values={original_resource_name}"
-                    ],  # TODO: consider adding other tags to this filter to truly ensure it is an instance from this stack/project
-                ),
-            ],
+
+        has_been_activated = self.role_name.apply(
+            lambda role_name: get_instances_output(
+                filters=[
+                    GetInstancesFilterArgs(
+                        name="IamRole",
+                        values=[role_name],  # type: ignore[reportArgumentType] # pyright somehow thinks that a role name can be None...which cannot happen
+                    ),
+                ],
+            )
         ).apply(lambda result: len(result.ids) > 0)
         _ = has_been_activated.apply(
             lambda been_activated: create_output_if_needed(  # it's a general anti-pattern to create resources inside an apply statement...but this is just a stack output, and I couldn't think of any other way
