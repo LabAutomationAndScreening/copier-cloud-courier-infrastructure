@@ -1,3 +1,5 @@
+import logging
+
 import pulumi_aws
 from ephemeral_pulumi_deploy import append_resource_suffix
 from ephemeral_pulumi_deploy import common_tags
@@ -12,6 +14,8 @@ from pulumi_aws.iam import GetPolicyDocumentStatementPrincipalArgs
 from pulumi_aws.iam import RolePolicy
 from pulumi_aws.iam import get_policy_document
 from pulumi_aws.ssm import Activation
+from pulumi_aws.ssm import GetInstancesFilterArgs
+from pulumi_aws.ssm import get_instances_output
 from pulumi_aws_native import TagArgs
 from pulumi_aws_native import iam
 from pulumi_aws_native import ssm
@@ -19,6 +23,8 @@ from pulumi_aws_native import ssm
 from .courier_config_models import SSM_PARAMETER_PREFIX
 from .courier_config_models import SSM_PARAMETER_PREFIX_TO_ALIASES
 from .models import LabComputerConfig
+
+logger = logging.getLogger(__name__)
 
 
 def _generate_activation_script_contents(
@@ -208,10 +214,30 @@ class OnPremNode(ComponentResource):
                 tags=common_tags(),
                 opts=ResourceOptions(parent=self, delete_before_replace=True),
             )
+        has_been_activated = get_instances_output(
+            filters=[
+                GetInstancesFilterArgs(
+                    name="tag-key",
+                    values=[
+                        f"Key=original-computer-info,Values={original_resource_name}"
+                    ],  # TODO: consider adding other tags to this filter to truly ensure it is an instance from this stack/project
+                ),
+            ],
+        ).apply(lambda result: len(result.ids) > 0)
+        if not has_been_activated:
+            export(
+                f"-{original_resource_name}-activation-script",
+                Output.all(activation.id, activation.activation_code).apply(
+                    lambda args: _generate_activation_script_contents(*args)
+                ),
+            )
 
-        export(
-            f"-{original_resource_name}-activation-script",
-            Output.all(activation.id, activation.activation_code).apply(
-                lambda args: _generate_activation_script_contents(*args)
-            ),
-        )
+    def has_been_activated(self) -> bool:
+        _ = get_instances_output(
+            filters=[
+                GetInstancesFilterArgs(name="ResourceType", values=["ManagedInstance"]),
+                GetInstancesFilterArgs(name="tag-key", values=["Key=original-computer-info,Values="]),
+            ],
+        ).apply(lambda x: logger.critical(repr(x.ids)))
+
+        return True
