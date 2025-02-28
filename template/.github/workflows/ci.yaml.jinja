@@ -77,7 +77,7 @@ jobs:
       AWS_REGION: {% endraw %}{{ aws_region_for_stack }}{% raw %}
       PULUMI_STACK_NAME: test-${{ needs.get-values.outputs.pr-short-num }}
       PYTHON_VERSION: {% endraw %}{{ python_version }}{% raw %}
-      DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure
+      DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure.lib
       PULUMI_PREVIEW: true
       PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
       PULUMI_UP_ROLE_NAME: InfraDeploy--{% endraw %}{{ repo_name }}{% raw %}
@@ -92,7 +92,7 @@ jobs:
       AWS_REGION: {% endraw %}{{ aws_region_for_stack }}{% raw %}
       PULUMI_STACK_NAME: staging
       PYTHON_VERSION: {% endraw %}{{ python_version }}{% raw %}
-      DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure
+      DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure.lib
       PULUMI_PREVIEW: true
       PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
       PULUMI_UP: ${{ github.ref == 'refs/heads/main' }}
@@ -107,7 +107,7 @@ jobs:
       AWS_REGION: {% endraw %}{{ aws_region_for_stack }}{% raw %}
       PULUMI_STACK_NAME: prod
       PYTHON_VERSION: {% endraw %}{{ python_version }}{% raw %}
-      DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure
+      DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure.lib
       PULUMI_PREVIEW: true
       PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
       PULUMI_UP: true
