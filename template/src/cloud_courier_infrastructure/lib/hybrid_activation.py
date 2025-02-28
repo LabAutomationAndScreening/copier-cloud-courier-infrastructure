@@ -185,7 +185,9 @@ class OnPremNode(ComponentResource):
         )
         fixed_tags = common_tags()  # changes to the tags of the Activation will trigger replacement
         fixed_tags["original-computer-info"] = original_resource_name
-        fixed_tags["installed-cloud-courier-agent-version"] = ""
+        fixed_tags["installed-cloud-courier-agent-version"] = (
+            "uninstalled"  # leaving it blank doesn't let you use it as a filter for SSM Command targeting
+        )
         activation = Activation(
             immutable_resource_name,
             description=f"For the computer originally named: {original_resource_name}.",
