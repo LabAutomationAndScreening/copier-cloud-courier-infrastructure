@@ -161,7 +161,7 @@ class OnPremNode(ComponentResource):
             opts=ResourceOptions(parent=role),
         )
         original_computer_info_tag_key = "original-computer-info"
-        installed_agent_version_tag_key = "installed-cloud-courier-agent-version"
+        installed_agent_version_tag_key = "installed-cloud-courier-agent-version"  # Warning! This tag key is used in the Cloud Courier Agent, so changing it will require changes there as well
         _ = RolePolicy(  # the native provider gave some odd CloudControl error about the policy, even though it has no Outputs in it
             append_resource_suffix(f"{resource_name}-update-instance-tag", max_length=100),
             role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
@@ -185,6 +185,13 @@ class OnPremNode(ComponentResource):
                                 values=[installed_agent_version_tag_key],
                             ),
                         ],
+                    ),
+                    GetPolicyDocumentStatementArgs(
+                        sid="FindInstanceId",
+                        effect="Allow",
+                        actions=["ssm:DescribeInstanceInformation"],
+                        resources=["*"],
+                        # does not appear to be an easy way to lock this down further, although maybe tags might help. but seems generally low risk
                     ),
                 ]
             ).json,
