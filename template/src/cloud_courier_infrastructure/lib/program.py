@@ -41,12 +41,13 @@ def pulumi_program() -> None:
         )
         all_node_alerts.append(NodeAlert(lab_computer_config=computer_config))
     _ = Dashboard(node_alerts=all_node_alerts)
+    cloud_courier_agent_version = "0.0.4"
     _ = CloudCourierAgentInstaller(
-        version="0.0.3",
+        version=cloud_courier_agent_version,
         files_to_package=[
             DistributorFileToPackage(
-                source_path="s3://manual-artifacts--artifact-stores--prod-82ba004/cloud-courier/v0.0.3/exe-windows-2022-3.12.7.zip",
-                local_name="exe-v0.0.3.zip",
+                source_path=f"s3://manual-artifacts--artifact-stores--prod-82ba004/cloud-courier/v{cloud_courier_agent_version}/exe-windows-2022-3.12.7.zip",
+                local_name=f"exe-v{cloud_courier_agent_version}.zip",
             )
         ],
         download_exe_from_github=DOWNLOAD_EXE_FROM_GITHUB,

@@ -270,7 +270,7 @@ class CloudCourierAgentInstaller(ComponentResource):
         )
 
     def _generate_uninstall_script(self) -> str:
-        return inspect.cleandoc(
+        return inspect.cleandoc(  # TODO: stop the exe before uninstalling it
             "".join(
                 [
                     rf"""
