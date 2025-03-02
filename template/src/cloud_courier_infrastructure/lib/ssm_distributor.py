@@ -4,7 +4,6 @@ import json
 import os
 from pathlib import Path
 from tempfile import gettempdir
-from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 from zipfile import ZipFile
 
@@ -27,16 +26,10 @@ from .ssm_lib import LOGS_DIR
 from .ssm_lib import STOP_FLAG_DIR
 from .ssm_lib import add_boilerplate_to_ps_script
 
-if TYPE_CHECKING:
-    from mypy_boto3_s3 import S3Client
-    from mypy_boto3_ssm import SSMClient
-
 
 def get_central_infra_ssm_packages_bucket_name() -> str:
     org_home_region = get_config_str("proj:aws_org_home_region")
-    ssm_client: SSMClient = boto3.client(
-        "ssm", region_name=org_home_region
-    )  # not sure why pyright is getting angry without the explicit type hint
+    ssm_client = boto3.client("ssm", region_name=org_home_region)
     bucket_param = ssm_client.get_parameter(Name="/org-managed/ssm-distributor-packages-bucket-name")["Parameter"]
     assert "Value" in bucket_param, f"Expected 'Value' in {bucket_param}"
     return bucket_param["Value"]
@@ -108,9 +101,7 @@ class DistributorFileToPackage(BaseModel):
 
 def download_s3_file(*, file_to_package: DistributorFileToPackage, local_file_dir: Path, aws_region: str) -> Path:
     boto_session = boto3.Session()
-    s3_client: S3Client = boto_session.client(
-        "s3", region_name=aws_region
-    )  # not sure why pyright is getting angry without the explicit type hint
+    s3_client = boto_session.client("s3", region_name=aws_region)
     parsed_url = urlparse(
         file_to_package.source_path, allow_fragments=False
     )  # based on https://stackoverflow.com/questions/42641315/s3-urls-get-bucket-name-and-path
