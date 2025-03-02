@@ -188,8 +188,8 @@ class CloudCourierAgentInstaller(ComponentResource):
             parent=self,
         )
         _ = ssm.Document(
-            append_resource_suffix(resource_name),
-            name=append_resource_suffix(resource_name),
+            append_resource_suffix(package_base_name),
+            name=append_resource_suffix(package_base_name),
             opts=ResourceOptions(
                 parent=self, depends_on=[upload_manifest_command.upload_command, upload_package_command.upload_command]
             ),
@@ -270,7 +270,7 @@ class CloudCourierAgentInstaller(ComponentResource):
         )
 
     def _generate_uninstall_script(self) -> str:
-        return inspect.cleandoc(
+        return inspect.cleandoc(  # TODO: stop the exe before uninstalling it
             "".join(
                 [
                     rf"""

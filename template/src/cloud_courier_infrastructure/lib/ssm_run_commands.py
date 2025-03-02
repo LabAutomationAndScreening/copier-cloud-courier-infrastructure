@@ -116,7 +116,7 @@ class CloudCourierSsmCommands(ComponentResource):
                     "mainSteps": [
                         {
                             "action": "aws:runPowerShellScript",
-                            "name": "StartCloudCourier",
+                            "name": "StopCloudCourier",
                             "precondition": {"StringEquals": ["platformType", "Windows"]},
                             "inputs": {
                                 "timeoutSeconds": 600,
