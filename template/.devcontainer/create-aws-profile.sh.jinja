@@ -2,22 +2,38 @@
 set -ex
 
 mkdir -p ~/.aws
+
+if [ "$GITHUB_ACTIONS" = "true" ]; then
+  LOCALSTACK_ENDPOINT_URL="http://localhost:4566"
+else
+  LOCALSTACK_ENDPOINT_URL="http://localstack:4566"
+fi
+
 cat >> ~/.aws/config <<EOF
-[profile development]
+{% endraw %}{% if aws_production_account_id is defined and aws_production_account_id != "" %}{% raw %}[profile development]
 sso_session = org
 sso_account_id = {% endraw %}{{ aws_development_account_id if use_staging_environment else aws_production_account_id }}{% raw %}
 sso_role_name = LowRiskAccountAdminAccess
-region = {% endraw %}{{ aws_org_home_region }}{% raw %}
+region = {% endraw %}{{ aws_org_home_region }}{% raw %}{% endraw %}{% endif %}{% raw %}
 
-[sso-session org]
+{% endraw %}{% if aws_identity_center_id is defined and aws_identity_center_id != "" %}{% raw %}[sso-session org]
 sso_start_url = https://{% endraw %}{{ aws_identity_center_id }}{% raw %}.awsapps.com/start
 sso_region = {% endraw %}{{ aws_org_home_region }}{% raw %}
-sso_registration_scopes = sso:account:access
+sso_registration_scopes = sso:account:access{% endraw %}{% endif %}{% raw %}
 
 [profile localstack]
-region={% endraw %}{{ aws_org_home_region }}{% raw %}
+region={% endraw %}{{ aws_org_home_region if (aws_org_home_region is defined and aws_org_home_region != "") else "us-east-1" }}{% raw %}
 output=json
-endpoint_url = http://localstack:4566
+endpoint_url = $LOCALSTACK_ENDPOINT_URL
+
+{% endraw %}{% if aws_central_infrastructure_account_id is defined and aws_central_infrastructure_account_id != "" %}{% raw %}
+[profile {% endraw %}{{ core_infra_base_access_profile_name }}{% raw %}]
+sso_session = org
+sso_role_name = {% endraw %}{{ core_infra_base_access_profile_name }}{% raw %}
+sso_account_id = {% endraw %}{{ aws_central_infrastructure_account_id }}{% raw %}
+region = {% endraw %}{{ aws_org_home_region }}{% raw %}
+
+{% endraw %}{% endif %}{% raw %}
 EOF
 cat >> ~/.aws/credentials <<EOF
 [localstack]

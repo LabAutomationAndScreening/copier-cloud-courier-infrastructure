@@ -3,4 +3,5 @@ set -ex
 
 # For some reason the directory is not setup correctly and causes build of devcontainer to fail since
 # it doesn't have access to the workspace directory. This can normally be done in post-start-command
-git config --global --add safe.directory /workspaces/{% endraw %}{{ repo_name }}
+git config --global --add safe.directory /workspaces/{% endraw %}{{ repo_name }}{% if python_package_registry is defined and python_package_registry != "PyPI" %}{% raw %}
+echo "!!! In order to install dependencies, you must authenticate into the private registry, so run this script to complete the process: source .devcontainer/manual-setup-deps.sh"{% endraw %}{% endif %}

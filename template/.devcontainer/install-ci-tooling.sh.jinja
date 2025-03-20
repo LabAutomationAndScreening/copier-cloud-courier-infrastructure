@@ -2,6 +2,11 @@
 # can pass in the full major.minor.patch version of python as an optional argument
 set -ex
 
+{% endraw %}{% if template_uses_javascript is defined and template_uses_javascript is sameas(true) %}{% raw %}
+npm -v
+npm install -g pnpm@{% endraw %}{{ pnpm_version }}{% raw %}
+pnpm -v{% endraw %}{% endif %}{% raw %}
+
 curl -LsSf https://astral.sh/uv/{% endraw %}{{ uv_version }}{% raw %}/install.sh | sh
 uv --version
 # TODO: add uv autocompletion to the shell https://docs.astral.sh/uv/getting-started/installation/#shell-autocompletion

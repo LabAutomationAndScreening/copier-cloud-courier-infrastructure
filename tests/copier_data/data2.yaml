@@ -1,10 +1,15 @@
 # Data managed by upstream template
 repo_name: another_repo
 repo_org_name: initech
+is_open_source: false
 description: Doing crazy things! So many things!
 ssh_port_number: 54321
 use_windows_in_ci: true
 
+
+python_package_registry: AWS CodeArtifact
+aws_central_infrastructure_account_id: 012321432543
+core_infra_base_access_profile_name: MyAccessRole
 aws_identity_center_id: d-9145c20053
 aws_org_home_region: us-east-1
 aws_production_account_id: 123456789012
@@ -13,8 +18,5 @@ aws_staging_account_id: 210987654321
 aws_test_account_id: 211735654321
 aws_development_account_id: 000321456870
 aws_region_for_stack: us-west-1
-
-
-
 # Data added based on the specifics of this template
 automatically_obtain_executable_from_github: false
