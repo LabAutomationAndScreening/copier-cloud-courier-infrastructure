@@ -68,7 +68,7 @@ runs:
       shell: bash
 
     - name: AWS OIDC
-      uses: aws-actions/configure-aws-credentials@v4.0.2
+      uses: aws-actions/configure-aws-credentials@v4.1.0
       with:
         role-to-assume: arn:aws:iam::${{ inputs.aws-account-id }}:role/${{ inputs.aws-role-name }}
         aws-region: ${{ inputs.aws-region }}

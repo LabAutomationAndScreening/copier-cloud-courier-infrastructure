@@ -5,14 +5,20 @@
   "features": {
     "ghcr.io/devcontainers/features/aws-cli:1": {
       // view latest version https://raw.githubusercontent.com/aws/aws-cli/v2/CHANGELOG.rst
-      "version": "2.19.3"
+      "version": "2.24.24"
     },
     "ghcr.io/devcontainers/features/python:1": {
       // https://github.com/devcontainers/features/tree/main/src/python
       "version": "{% endraw %}{{ python_version }}{% raw %}",
       "installTools": false,
       "optimize": true
+    }{% endraw %}{% if is_child_of_copier_base_template is not defined and template_uses_javascript is defined and template_uses_javascript is sameas(true) %}{% raw %},
+    "ghcr.io/devcontainers/features/node:1.6.1": {
+      // https://github.com/devcontainers/features/tree/main/src/node
+      "version": "{% endraw %}{{ node_version }}{% raw %}",
+      "pnpmVersion": "{% endraw %}{{ pnpm_version }}{% raw %}"
     }
+{% endraw %}{% endif %}{% raw %}
   },
   "customizations": {
     "vscode": {
@@ -30,6 +36,14 @@
         "ms-python.vscode-pylance@2024.9.2",
         "ms-vscode-remote.remote-containers@0.383.0",
         "charliermarsh.ruff@2024.54.0",
+
+{% endraw %}{% if is_child_of_copier_base_template is not defined and template_uses_vuejs is defined and template_uses_vuejs is sameas(true) %}{% raw %}
+        // VueJS
+        "vue.volar@2.2.8",
+{% endraw %}{% endif %}{% raw %}{% endraw %}{% if is_child_of_copier_base_template is not defined and template_uses_javascript is defined and template_uses_javascript is sameas(true) %}{% raw %}
+        // All javascript
+        "dbaeumer.vscode-eslint@3.0.13",
+{% endraw %}{% endif %}{% raw %}
 
         // Misc file formats
         "bierner.markdown-mermaid@1.25.0",

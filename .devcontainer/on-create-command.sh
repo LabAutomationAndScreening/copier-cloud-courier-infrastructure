@@ -7,6 +7,6 @@ git config --global --add safe.directory /workspaces/copier-cloud-courier-infras
 
 sh .devcontainer/on-create-command-boilerplate.sh
 
-sh .devcontainer/manual-setup-deps.sh
-
 pre-commit install --install-hooks
+
+sh .devcontainer/manual-setup-deps.sh --optionally-lock

@@ -11,6 +11,11 @@ description:
     type: str
     help: What is the description of this repository?
 
+is_open_source:
+    type: bool
+    help: Is this library open source?
+    default: no
+
 ssh_port_number:
     type: int
     help: What port should the devcontainer bind SSH to?
@@ -21,20 +26,45 @@ use_windows_in_ci:
     help: Should CI in the instantiated template also use Windows runners?
     default: no
 
+
 python_version:
     type: str
     help: What version of Python is used for development?
     default: "3.12.7"
 
+python_package_registry:
+    type: str
+    help: What registry should Python Packgaes be installed from?
+    choices:
+        - PyPI
+        - AWS CodeArtifact
+    default: PyPI
+
 
 aws_identity_center_id:
     type: str
     help: What's the ID of your Organization's AWS Identity center, e.g. d-9145c20053?
+    when: "{{ python_package_registry == 'AWS CodeArtifact' or True }}"
 
 aws_org_home_region:
     type: str
     help: What is the home region of the AWS Organization (where all of the central infrastructure is deployed)?
     default: us-east-1
+    when: "{{ python_package_registry == 'AWS CodeArtifact' or True }}"
+
+aws_central_infrastructure_account_id:
+    type: str
+    help: What's the ID of your Organization's AWS Account containing Central Infrastructure (e.g. CodeArtifact)?
+    when: "{{ python_package_registry == 'AWS CodeArtifact' }}"
+
+core_infra_base_access_profile_name:
+    type: str
+    help: What's the AWS Identity Center Profile name for base access to the Central Infrastructure account (i.e. to read from CodeArtifact)?
+    when: "{{ python_package_registry == 'AWS CodeArtifact' }}"
+    default: CoreInfraBaseAccess
+
+
+
 
 aws_production_account_id:
     type: str

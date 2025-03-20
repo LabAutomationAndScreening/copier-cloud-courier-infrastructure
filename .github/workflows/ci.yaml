@@ -29,6 +29,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
 
+
+
       - name: Install latest versions of python packages
         uses: ./.github/actions/install_deps_uv
         with:
@@ -36,13 +38,13 @@ jobs:
 
       - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
         if: ${{ runner.os != 'Windows' }} # we're just gonna have to YOLO on Windows, because this action doesn't support it yet https://github.com/ben-z/gh-action-mutex/issues/14
-        uses: ben-z/gh-action-mutex@d3d5b354d460d4b6a1e3ee5b7951678658327812 # v1.0.0-alpha.9
+        uses: ben-z/gh-action-mutex@1ebad517141198e08d47cf72f3c0975316620a65 # v1.0.0-alpha.10
         with:
           branch: mutex-venv-${{ matrix.os }}-${{ matrix.python-version }}
         timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
 
       - name: Cache Pre-commit hooks
-        uses: actions/cache@v4.2.0
+        uses: actions/cache@v4.2.2
         env:
           cache-name: cache-pre-commit-hooks
         with:
@@ -64,7 +66,7 @@ jobs:
 
           - 3.12.7
 
-          - 3.13.1
+          - 3.13.2
 
         copier: [
           '--data-file tests/copier_data/data1.yaml',
@@ -75,6 +77,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
+
+      - name: Move python script that replaces private package registry information to temp folder so it doesn't get deleted
+        run: |
+          mv .github/workflows/replace_private_package_registries.py $RUNNER_TEMP
 
       - name: Install python tooling
         uses: ./.github/actions/install_deps_uv
@@ -106,7 +112,12 @@ jobs:
 
 
       - name: install new dependencies
+        env:
+          # Provide a fake token so it doesn't attempt to access AWS to generate a new one when the script is run if CodeArtifact is set as the registry
+          CODEARTIFACT_AUTH_TOKEN: 'faketoken'
         run: |
+          # Remove any specification of a Python repository having a default other than PyPI...because in this CI pipeline we can only install from PyPI
+          python $RUNNER_TEMP/replace_private_package_registries.py
           sh .devcontainer/manual-setup-deps.sh ${{ matrix.python-version }} --skip-lock
           # Add everything to git so that pre-commit recognizes the files and runs on them
           git add .
@@ -114,13 +125,13 @@ jobs:
 
       - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
         if: ${{ runner.os != 'Windows' }} # we're just gonna have to YOLO on Windows, because this action doesn't support it yet https://github.com/ben-z/gh-action-mutex/issues/14
-        uses: ben-z/gh-action-mutex@d3d5b354d460d4b6a1e3ee5b7951678658327812 # v1.0.0-alpha.9
+        uses: ben-z/gh-action-mutex@1ebad517141198e08d47cf72f3c0975316620a65 # v1.0.0-alpha.10
         with:
           branch: mutex-venv-${{ matrix.os }}-${{ matrix.python-version }}
         timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
 
       - name: Cache Pre-commit hooks
-        uses: actions/cache@v4.2.0
+        uses: actions/cache@v4.2.2
         env:
           cache-name: cache-pre-commit-hooks
         with:
