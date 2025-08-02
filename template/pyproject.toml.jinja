@@ -33,7 +33,7 @@ dev = [
     "pytest>={% endraw %}{{ pytest_version }}{% raw %}",
     "pytest-cov>={% endraw %}{{ pytest_cov_version }}{% raw %}",
     "pytest-randomly>={% endraw %}{{ pytest_randomly_version }}{% raw %}",
-    "boto3-stubs[all]==1.36.3", # there's a bug/conflict in 1.37.4 affecting pyright: https://github.com/LabAutomationAndScreening/copier-cloud-courier-infrastructure/actions/runs/13596390146/job/38014193360#step:11:69
+    "boto3-stubs[all]>={% endraw %}{{ boto3_version }}{% raw %}",
 ]
 
 

@@ -26,7 +26,7 @@ region={% endraw %}{{ aws_org_home_region if (aws_org_home_region is defined and
 output=json
 endpoint_url = $LOCALSTACK_ENDPOINT_URL
 
-{% endraw %}{% if aws_central_infrastructure_account_id is defined and aws_central_infrastructure_account_id != "" %}{% raw %}
+{% endraw %}{% if aws_central_infrastructure_account_id is defined and aws_central_infrastructure_account_id != "" and aws_central_infrastructure_account_id != "000000000000" %}{% raw %}
 [profile {% endraw %}{{ core_infra_base_access_profile_name }}{% raw %}]
 sso_session = org
 sso_role_name = {% endraw %}{{ core_infra_base_access_profile_name }}{% raw %}

@@ -12,49 +12,18 @@ env:
 
 permissions:
     id-token: write
-    contents: write # needed for mutex
+    contents: write # needed for mutex, and updating dependabot branches
+    statuses: write # needed for updating status on Dependabot PRs
 
 jobs:
+  get-values:
+    uses: ./.github/workflows/get-values.yaml
+
   pre-commit:
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - "ubuntu-24.04"
-        python-version:
-            - 3.12.7
-    name: Pre-commit for Py${{ matrix.python-version }} on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.2.2
-
-
-
-      - name: Install latest versions of python packages
-        uses: ./.github/actions/install_deps_uv
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
-        if: ${{ runner.os != 'Windows' }} # we're just gonna have to YOLO on Windows, because this action doesn't support it yet https://github.com/ben-z/gh-action-mutex/issues/14
-        uses: ben-z/gh-action-mutex@1ebad517141198e08d47cf72f3c0975316620a65 # v1.0.0-alpha.10
-        with:
-          branch: mutex-venv-${{ matrix.os }}-${{ matrix.python-version }}
-        timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
-
-      - name: Cache Pre-commit hooks
-        uses: actions/cache@v4.2.2
-        env:
-          cache-name: cache-pre-commit-hooks
-        with:
-          path: ${{ env.PRE_COMMIT_HOME }}
-          key: ${{ matrix.os }}-${{ matrix.python-version }}-build-${{ env.cache-name }}-${{ hashFiles('.pre-commit-config.yaml') }}
-          restore-keys: |
-            ${{ matrix.os }}-${{ matrix.python-version }}-build-${{ env.cache-name }}-
-
-      - name: Run pre-commit
-        run:  pre-commit run -a
+    needs: [ get-values ]
+    uses: ./.github/workflows/pre-commit.yaml
+    with:
+      python-version: 3.12.7
 
   lint-matrix:
     needs: [ pre-commit ]
@@ -82,11 +51,11 @@ jobs:
         run: |
           mv .github/workflows/replace_private_package_registries.py $RUNNER_TEMP
 
-      - name: Install python tooling
-        uses: ./.github/actions/install_deps_uv
+      - name: Install tooling
+        uses: ./.github/actions/install_deps
         with:
           python-version: ${{ matrix.python-version }}
-          uv-sync: false
+          install-deps: false
 
       - name: Instantiate copier template
         run: |
@@ -118,7 +87,7 @@ jobs:
         run: |
           # Remove any specification of a Python repository having a default other than PyPI...because in this CI pipeline we can only install from PyPI
           python $RUNNER_TEMP/replace_private_package_registries.py
-          sh .devcontainer/manual-setup-deps.sh ${{ matrix.python-version }} --skip-lock
+          python .devcontainer/manual-setup-deps.py --skip-check-lock
           # Add everything to git so that pre-commit recognizes the files and runs on them
           git add .
           git status
@@ -131,7 +100,7 @@ jobs:
         timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
 
       - name: Cache Pre-commit hooks
-        uses: actions/cache@v4.2.2
+        uses: actions/cache@v4.2.3
         env:
           cache-name: cache-pre-commit-hooks
         with:
@@ -142,8 +111,8 @@ jobs:
 
       - name: Run pre-commit
         run: |
-          # skip pip-compile because the command line args in the header are different
-          SKIP=git-dirty pre-commit run -a
+          # skip devcontainer context hash because the template instantiation may make it different every time
+          SKIP=git-dirty,compute-devcontainer-context-hash pre-commit run -a
 
       - name: Upload pre-commit log if failure
         if: ${{ failure() }}
@@ -154,10 +123,20 @@ jobs:
 
   required-check:
     runs-on: ubuntu-24.04
-    needs: [ lint-matrix ]
+    needs: [ lint-matrix, get-values ]
     if: always()
     steps:
       - name: fail if prior job failure
         if: needs.lint-matrix.result != 'success'
         run: |
           exit 1
+      - name: Mark updated dependabot hash commit as succeeded
+        if: needs.get-values.outputs.dependabot-commit-created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            -X POST -H "Accept: application/vnd.github.v3+json" \
+            "/repos/${{ github.repository }}/statuses/${{ needs.get-values.outputs.new-dependabot-sha }}" \
+            -f state=success -f context="required-check" -f description="Initial CI run passed" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

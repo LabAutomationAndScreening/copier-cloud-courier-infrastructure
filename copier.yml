@@ -19,7 +19,8 @@ is_open_source:
 ssh_port_number:
     type: int
     help: What port should the devcontainer bind SSH to?
-    default: "{{ range(49152, 65536) | random }}"
+    # Pick a random port, but ensure it's not in the excluded port range on Windows (powershell: `netsh int ipv4 show excludedportrange protocol=tcp`)
+    default: "{{ ( (range(49152, 49752)   | list) + (range(49852, 50000)   | list) + (range(50060, 50160)   | list) + (range(50160, 50260)   | list) + (range(50260, 50360)   | list) + (range(50914, 51014)   | list) + (range(51114, 51214)   | list) + (range(51214, 51314)   | list) + (range(51314, 51414)   | list) + (range(51623, 51723)   | list) + (range(51723, 51823)   | list) + (range(65269, 65369)   | list) + (range(65369, 65469)   | list) ) | random }}"
 
 use_windows_in_ci:
     type: bool
@@ -56,6 +57,7 @@ aws_central_infrastructure_account_id:
     type: str
     help: What's the ID of your Organization's AWS Account containing Central Infrastructure (e.g. CodeArtifact)?
     when: "{{ python_package_registry == 'AWS CodeArtifact' }}"
+    default: "000000000000"
 
 core_infra_base_access_profile_name:
     type: str
@@ -115,7 +117,7 @@ _templates_suffix: .jinja
 _exclude:
     - "copier.yml"
 
-# adapted from https://github.com/copier-org/copier-templates-extensions#context-hook-extension
+# adapted from https://github.com/copier-org/copier-template-extensions#context-hook-extension
 _jinja_extensions:
-- copier_templates_extensions.TemplateExtensionLoader
+- copier_template_extensions.TemplateExtensionLoader
 - extensions/context.py:ContextUpdater

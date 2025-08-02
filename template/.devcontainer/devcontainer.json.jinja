@@ -3,12 +3,13 @@
   "service": "devcontainer",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "features": {
-    "ghcr.io/devcontainers/features/aws-cli:1": {
+    "ghcr.io/devcontainers/features/aws-cli:1.1.1": {
+      // https://github.com/devcontainers/features/blob/main/src/aws-cli/devcontainer-feature.json
       // view latest version https://raw.githubusercontent.com/aws/aws-cli/v2/CHANGELOG.rst
-      "version": "2.24.24"
+      "version": "2.27.14"
     },
-    "ghcr.io/devcontainers/features/python:1": {
-      // https://github.com/devcontainers/features/tree/main/src/python
+    "ghcr.io/devcontainers/features/python:1.7.1": {
+      // https://github.com/devcontainers/features/blob/main/src/python/devcontainer-feature.json
       "version": "{% endraw %}{{ python_version }}{% raw %}",
       "installTools": false,
       "optimize": true
@@ -17,8 +18,7 @@
       // https://github.com/devcontainers/features/tree/main/src/node
       "version": "{% endraw %}{{ node_version }}{% raw %}",
       "pnpmVersion": "{% endraw %}{{ pnpm_version }}{% raw %}"
-    }
-{% endraw %}{% endif %}{% raw %}
+    }{% endraw %}{% endif %}{% raw %}
   },
   "customizations": {
     "vscode": {
@@ -26,27 +26,26 @@
       "extensions": [
         // basic tooling
         "eamodio.gitlens@15.5.1",
-        "ms-vscode.live-server@0.5.2024091601",
+        "ms-vscode.live-server@0.5.2025051301",
         "MS-vsliveshare.vsliveshare@1.0.5905",
-        "github.copilot@1.234.0",
-        "github.copilot-chat@0.20.2",
+        "github.copilot@1.320.1564",
+        "github.copilot-chat@0.28.2025051402",
 
         // Python
-        "ms-python.python@2024.14.1",
-        "ms-python.vscode-pylance@2024.9.2",
-        "ms-vscode-remote.remote-containers@0.383.0",
-        "charliermarsh.ruff@2024.54.0",
-
+        "ms-python.python@2025.7.2025051401",
+        "ms-python.vscode-pylance@2025.4.104",
+        "ms-vscode-remote.remote-containers@0.414.0",
+        "charliermarsh.ruff@2025.22.0",
 {% endraw %}{% if is_child_of_copier_base_template is not defined and template_uses_vuejs is defined and template_uses_vuejs is sameas(true) %}{% raw %}
         // VueJS
         "vue.volar@2.2.8",
+        "vitest.explorer@1.16.1",
 {% endraw %}{% endif %}{% raw %}{% endraw %}{% if is_child_of_copier_base_template is not defined and template_uses_javascript is defined and template_uses_javascript is sameas(true) %}{% raw %}
         // All javascript
         "dbaeumer.vscode-eslint@3.0.13",
 {% endraw %}{% endif %}{% raw %}
-
         // Misc file formats
-        "bierner.markdown-mermaid@1.25.0",
+        "bierner.markdown-mermaid@1.28.0",
         "samuelcolvin.jinjahtml@0.20.0",
         "tamasfe.even-better-toml@0.19.2",
         "emilast.LogFileHighlighter@3.3.3",
@@ -56,6 +55,7 @@
         "editor.accessibilitySupport": "off", // turn off sounds
         "extensions.autoUpdate": false,
         "extensions.autoCheckUpdates": false,
+        "livePreview.portNumber": 3025, // arbitrary not to conflict with default 3000 Nuxt port number
         "[python]": {
           "editor.formatOnSave": true,
           "editor.defaultFormatter": "charliermarsh.ruff"
@@ -63,7 +63,7 @@
         "ruff.nativeServer": "on",
         // TODO: see if there's a way to specify different configurations for different folders
         "ruff.configuration": "/workspaces/{% endraw %}{{ repo_name }}{% raw %}/ruff-test.toml", // use the test configuration since it's less restrictive and won't show false positives and underline things
-        "[jsonc][json][javascript][typescript][graphql]": {
+        "[jsonc][json][javascript][typescript][graphql][css][scss][html][vue]": {
           "editor.defaultFormatter": "esbenp.prettier-vscode",
           "editor.formatOnSave": true
         }

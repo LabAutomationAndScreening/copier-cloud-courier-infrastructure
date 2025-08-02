@@ -6,12 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12.7"
 dependencies = [
     # Managed by upstream template
-    "pytest>=8.3.4",
-    "pytest-cov>=6.0.0",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
     "pytest-randomly>=3.16.0",
-    "pyright[nodejs]>=1.1.397",
-    "copier>=9.5.0",
-    "copier-templates-extensions>=0.3.0"
+    "pyright[nodejs]>=1.1.403",
+    "copier>=9.8.0",
+    "copier-template-extensions>=0.3.2"
 
     # Specific to this template
 

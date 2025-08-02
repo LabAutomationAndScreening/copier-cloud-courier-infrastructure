@@ -67,6 +67,19 @@ on:
       PYTHON_VERSION:
         required: true
         type: string
+      PROJECT_DIR:
+        required: false
+        default: '.'
+        type: string
+      ADDITIONAL_MUTEX_SUFFIX:
+        description: 'additional text to add on to the mutex branch name to determine more specific locking beyond just the stack name'
+        required: false
+        default: ''
+        type: string
+    secrets:
+      iac-github-api-tokens:
+        description: 'API tokens to use for Github IaC deployment when not using AWS Secrets Manager'
+        required: false
 
 
 env:
@@ -80,6 +93,8 @@ permissions:
 jobs:
   pulumi:
     runs-on: ubuntu-24.04
+    env:
+      IAC_GITHUB_API_TOKENS: ${{ secrets.iac-github-api-tokens }} # only used in non-enterprise situations when not using full fledged Secrets Manager
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
@@ -87,21 +102,21 @@ jobs:
           ref: ${{ inputs.CHECKOUT_REF }}
 
       - name: Install latest versions of python packages
-        uses: ./.github/actions/install_deps_uv
+        uses: ./.github/actions/install_deps
         with:
           python-version: ${{ inputs.PYTHON_VERSION }}
 
       - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
         uses: ben-z/gh-action-mutex@1ebad517141198e08d47cf72f3c0975316620a65 # v1.0.0-alpha.10
         with:
-          branch: mutex-pulumi-${{ inputs.PULUMI_STACK_NAME }}
+          branch: mutex-pulumi-${{ inputs.PULUMI_STACK_NAME }}-${{ inputs.ADDITIONAL_MUTEX_SUFFIX }}
         timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
 
       - name: Pulumi Initial Destroy to cleanup any leftovers
         uses: ./.github/actions/pulumi_ephemeral_deploy
         if: ${{ inputs.PULUMI_DESTROY && !inputs.SKIP_INITIAL_PULUMI_DESTROY }}
         with:
-          project-dir: "."
+          project-dir: ${{ inputs.PROJECT_DIR }}
           deploy-script-module-name: ${{ inputs.DEPLOY_SCRIPT_MODULE_NAME }}
           stack-name: ${{ inputs.PULUMI_STACK_NAME }}
           aws-role-name: ${{ inputs.PULUMI_UP_ROLE_NAME }}
@@ -114,7 +129,7 @@ jobs:
         uses: ./.github/actions/pulumi_ephemeral_deploy
         if: ${{ inputs.PULUMI_PREVIEW }}
         with:
-          project-dir: "."
+          project-dir: ${{ inputs.PROJECT_DIR }}
           deploy-script-module-name: ${{ inputs.DEPLOY_SCRIPT_MODULE_NAME }}
           stack-name: ${{ inputs.PULUMI_STACK_NAME }}
           aws-role-name: ${{ inputs.PREVIEW_ROLE_NAME }}
@@ -127,7 +142,7 @@ jobs:
         uses: ./.github/actions/pulumi_ephemeral_deploy
         if: ${{ inputs.PULUMI_REFRESH }}
         with:
-          project-dir: "."
+          project-dir: ${{ inputs.PROJECT_DIR }}
           deploy-script-module-name: ${{ inputs.DEPLOY_SCRIPT_MODULE_NAME }}
           stack-name: ${{ inputs.PULUMI_STACK_NAME }}
           aws-role-name: ${{ inputs.REFRESH_ROLE_NAME }}
@@ -140,7 +155,7 @@ jobs:
         uses: ./.github/actions/pulumi_ephemeral_deploy
         if: ${{ inputs.PULUMI_UP }}
         with:
-          project-dir: "."
+          project-dir: ${{ inputs.PROJECT_DIR }}
           deploy-script-module-name: ${{ inputs.DEPLOY_SCRIPT_MODULE_NAME }}
           stack-name: ${{ inputs.PULUMI_STACK_NAME }}
           aws-role-name: ${{ inputs.PULUMI_UP_ROLE_NAME }}
@@ -153,7 +168,7 @@ jobs:
         uses: ./.github/actions/pulumi_ephemeral_deploy
         if: ${{ inputs.PULUMI_DESTROY && !inputs.SKIP_FINAL_PULUMI_DESTROY }}
         with:
-          project-dir: "."
+          project-dir: ${{ inputs.PROJECT_DIR }}
           deploy-script-module-name: ${{ inputs.DEPLOY_SCRIPT_MODULE_NAME }}
           stack-name: ${{ inputs.PULUMI_STACK_NAME }}
           aws-role-name: ${{ inputs.PULUMI_UP_ROLE_NAME }}
