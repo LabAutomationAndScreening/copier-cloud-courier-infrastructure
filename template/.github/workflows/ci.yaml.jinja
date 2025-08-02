@@ -13,66 +13,23 @@ env:
 
 permissions:
     id-token: write
-    contents: write # needed for mutex
+    contents: write # needed for mutex, and updating dependabot branches
+    statuses: write # needed for updating status on Dependabot PRs
 
 jobs:
-  lint:
-    name: Pre-commit
-    runs-on: {% endraw %}{{ gha_linux_runner }}{% raw %}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@{% endraw %}{{ gha_checkout }}{% raw %}
-
-      - name: Install latest versions of python packages
-        uses: ./.github/actions/install_deps_uv
-        with:
-          python-version: {% endraw %}{{ python_version }}{% raw %}
-
-      - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
-        if: ${{ runner.os != 'Windows' }} # we're just gonna have to YOLO on Windows, because this action doesn't support it yet https://github.com/ben-z/gh-action-mutex/issues/14
-        uses: ben-z/gh-action-mutex@{% endraw %}{{ gha_mutex }}{% raw %}
-        with:
-          branch: mutex-venv-{% endraw %}{{ gha_linux_runner }}{% raw %}-py{% endraw %}{{ python_version }}{% raw %}
-        timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
-
-      - name: Cache Pre-commit hooks
-        uses: actions/cache@{% endraw %}{{ gha_cache }}{% raw %}
-        env:
-          cache-name: cache-pre-commit-hooks
-        with:
-          path: ${{ env.PRE_COMMIT_HOME }}
-          key: {% endraw %}{{ gha_linux_runner }}{% raw %}-py{% endraw %}{{ python_version }}{% raw %}-build-${{ env.cache-name }}-${{ hashFiles('.pre-commit-config.yaml') }}
-          restore-keys: |
-            {% endraw %}{{ gha_linux_runner }}{% raw %}-py{% endraw %}{{ python_version }}{% raw %}-build-${{ env.cache-name }}-
-
-      - name: Run pre-commit
-        run:  pre-commit run -a
-
   get-values:
-    runs-on: {% endraw %}{{ gha_linux_runner }}{% raw %}
-    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-    outputs:
-      pr-short-num: ${{ steps.find-pr-num.outputs.number }}
-    steps:
-      - name: Get the PR number
-        id: find-pr-num
-        # Based on https://github.com/actions/checkout/issues/58#issuecomment-847922894
-        run: |
+    uses: ./.github/workflows/get-values.yaml
 
-          [[ '${{ github.event_name }}' = 'pull_request' ]] && full_number=${{ github.event.number }}
-
-          # example message in merge group context: "Merge pull request #10 from org-name/branch-name\n\ncommit message"
-          [[ '${{ github.event_name }}' = 'merge_group' ]] && message='${{ github.event.merge_group.head_commit.message }}' && echo Extracting from $message && number_and_following_text=${message##*#} && full_number=${number_and_following_text%%[!0-9]*}
-
-          short_number=${full_number:${#full_number}<2?0:-2} # only use the last two digits so that the stack name is no more than 7 characters and doesn't get too long. Based on https://stackoverflow.com/questions/19858600/accessing-last-x-characters-of-a-string-in-bash
-
-          echo number=$(echo $short_number) >> $GITHUB_OUTPUT
-          echo "PR number extracted as $full_number and truncated to $short_number"
+  pre-commit:
+    needs: [ get-values ]
+    uses: ./.github/workflows/pre-commit.yaml
+    with:
+      python-version: {% endraw %}{{ python_version }}{% raw %}
 
   ephemeral-test:
     uses: ./.github/workflows/pulumi-aws.yml
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-    needs: [ lint, get-values ]
+    needs: [ pre-commit, get-values ]
     with:
       AWS_REGION: {% endraw %}{{ aws_region_for_stack }}{% raw %}
       PULUMI_STACK_NAME: test-${{ needs.get-values.outputs.pr-short-num }}
@@ -87,7 +44,7 @@ jobs:
 
   pulumi-staging:
     uses: ./.github/workflows/pulumi-aws.yml
-    needs: [ lint ]
+    needs: [ pre-commit ]
     with:
       AWS_REGION: {% endraw %}{{ aws_region_for_stack }}{% raw %}
       PULUMI_STACK_NAME: staging
@@ -117,17 +74,16 @@ jobs:
 
   required-check:
     runs-on: {% endraw %}{{ gha_linux_runner }}{% raw %}
-    needs: [ get-values, lint, ephemeral-test, pulumi-staging, pulumi-prod ]
+    needs: [ get-values, ephemeral-test, pulumi-staging, pulumi-prod ]
     if: always()
     steps:
       - name: Show job status
         run: |
-          echo ${{ needs.lint.result }}
           echo ${{ needs.pulumi-staging.result }}
           echo ${{ needs.get-values.result }}
           echo ${{ needs.ephemeral-test.result }}
           echo ${{ needs.pulumi-prod.result }}
       - name: fail if prior job failure
-        if: needs.lint.result != 'success' || needs.pulumi-staging.result != 'success' || (needs.get-values.result != 'success' && needs.get-values.result != 'skipped') || (needs.ephemeral-test.result != 'success' && needs.ephemeral-test.result != 'skipped') || (needs.pulumi-prod.result != 'success' && needs.pulumi-prod.result != 'skipped')
+        if: needs.pulumi-staging.result != 'success' || (needs.get-values.result != 'success' && needs.get-values.result != 'skipped') || (needs.ephemeral-test.result != 'success' && needs.ephemeral-test.result != 'skipped') || (needs.pulumi-prod.result != 'success' && needs.pulumi-prod.result != 'skipped')
         run: |
           exit 1{% endraw %}
