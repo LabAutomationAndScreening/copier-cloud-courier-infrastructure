@@ -1,0 +1,154 @@
+name: Build Docker Image
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: 'Docker repository'
+        type: string
+        required: true
+      image_name:
+        description: 'Docker image name'
+        type: string
+        required: true
+      tag-for-production:
+        description: 'Whether or not to add a tag indicating this is being used in production'
+        type: boolean
+        required: false
+        default: false
+      context:
+        description: 'Build context path'
+        type: string
+        required: false
+        default: './'
+      push-role-name:
+        type: string
+        description: What's the IAM role name to use for Pushing to the ECR?
+        required: false
+        default: no-push
+      save-as-artifact:
+        type: boolean
+        description: 'Should the image be saved as an artifact?'
+        required: false
+        default: false
+
+permissions:
+    id-token: write
+    contents: write # needed for mutex
+
+jobs:
+  build-image:
+    name: Build Docker Image
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Parse ECR URL
+        if: ${{ inputs.push-role-name != 'no-push' }}
+        id: parse_ecr_url
+        run: |
+          ECR_URL="${{ inputs.repository}}"
+
+          # Extract the AWS Account ID, which is the first field
+          AWS_ACCOUNT_ID=$(echo "$ECR_URL" | cut -d. -f1)
+
+          # Extract the AWS Region, which is the fourth field in the URL structure
+          AWS_REGION=$(echo "$ECR_URL" | cut -d. -f4)
+
+          # Set the outputs for use in later steps
+          echo "aws_account_id=${AWS_ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
+          echo "aws_region=${AWS_REGION}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: OIDC Auth for ECR
+        if: ${{ inputs.push-role-name != 'no-push' }}
+        uses: aws-actions/configure-aws-credentials@v4.2.0
+        with:
+          role-to-assume: arn:aws:iam::${{ steps.parse_ecr_url.outputs.aws_account_id }}:role/${{ inputs.push-role-name }}
+          aws-region: ${{ steps.parse_ecr_url.outputs.aws_region }}
+
+      - name: Calculate hash of files in build context
+        id: calculate-build-context-hash
+        run: |
+          python3 --version
+          BUILD_HASH=$(python3 .github/workflows/hash_git_files.py ${{ inputs.context }})
+          echo "build_context_tag=context-${BUILD_HASH}" >> "$GITHUB_OUTPUT"
+          echo "Calculated build context tag as: ${BUILD_HASH}"
+
+          IMAGE_NAME_WITH_NAMESPACE="${{ inputs.image_name }}"
+          IMAGE_NAME_NO_SLASHES="${IMAGE_NAME_WITH_NAMESPACE//\//-}"
+          echo "image_name_no_slashes=${IMAGE_NAME_NO_SLASHES}" >> "$GITHUB_OUTPUT"
+          echo "Image name without slashes: ${IMAGE_NAME_NO_SLASHES}"
+
+      - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
+        if: ${{ inputs.push-role-name != 'no-push' }}
+        uses: ben-z/gh-action-mutex@1ebad517141198e08d47cf72f3c0975316620a65 # v1.0.0-alpha.10
+        with:
+          branch: mutex-${{ inputs.repository }}-${{ inputs.image_name }}
+        timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
+
+      - name: Test if docker image exists
+        if: ${{ inputs.push-role-name != 'no-push' }}
+        id: check-if-exists
+        run: |
+          BUILD_HASH=${{ steps.calculate-build-context-hash.outputs.build_context_tag }}
+          echo Checking for : $BUILD_HASH
+          if aws ecr describe-images --region ${{ steps.parse_ecr_url.outputs.aws_region }} --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids=imageTag=$BUILD_HASH; then \
+            echo "Image was found in ECR"; \
+            echo "status=found" >> $GITHUB_OUTPUT
+          else \
+            echo "Image was not found in ECR"; \
+            echo "status=notfound" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Login to Amazon ECR
+        if: ${{ inputs.push-role-name != 'no-push' && (steps.check-if-exists.outputs.status == 'notfound' || inputs.save-as-artifact ) }}
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2.0.1
+
+      - name: Pull existing image to package as artifact
+        if: ${{ inputs.save-as-artifact && steps.check-if-exists.outputs.status == 'found' }}
+        run: |
+          docker pull ${{ inputs.repository }}/${{ inputs.image_name }}:${{ steps.calculate-build-context-hash.outputs.build_context_tag }}
+
+      - name: Set up Docker Buildx
+        if: ${{ (inputs.save-as-artifact && inputs.push-role-name == 'no-push') || steps.check-if-exists.outputs.status == 'notfound' }}
+        uses: docker/setup-buildx-action@v3.10.0
+        with:
+          version: v0.22.0
+
+      - name: Build Docker Image
+        if: ${{ (inputs.save-as-artifact && inputs.push-role-name == 'no-push') || steps.check-if-exists.outputs.status == 'notfound' }}
+        uses: docker/build-push-action@v6.16.0
+        with:
+          context: ${{ inputs.context }}
+          push: ${{ inputs.push-role-name != 'no-push' && steps.check-if-exists.outputs.status == 'notfound' }}
+          load: ${{ inputs.save-as-artifact }} # make the image available later for the `docker save` step
+          tags: ${{ inputs.repository }}/${{ inputs.image_name }}:${{ steps.calculate-build-context-hash.outputs.build_context_tag }}
+
+      - name: Add git sha tag
+        if: ${{ inputs.push-role-name != 'no-push' }}
+        run: |
+          aws ecr batch-get-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids imageTag=${{ steps.calculate-build-context-hash.outputs.build_context_tag }} --query 'images[].imageManifest' --output text > manifest.json
+          aws ecr put-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-tag git-sha-${{ github.sha }} --image-manifest file://manifest.json
+
+      - name: Add tag for Production
+        if: ${{ inputs.push-role-name != 'no-push' && inputs.tag-for-production }}
+        run: |
+          aws ecr batch-get-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids imageTag=${{ steps.calculate-build-context-hash.outputs.build_context_tag }} --query 'images[].imageManifest' --output text > manifest.json
+          # TODO: figure out some better conditional logic about adding a tag for the context in production, so we don't have to `|| true` at the end
+          aws ecr put-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-tag production--${{ steps.calculate-build-context-hash.outputs.build_context_tag }} --image-manifest file://manifest.json || true
+          aws ecr put-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-tag production--git-sha-${{ github.sha }} --image-manifest file://manifest.json
+
+      - name: Save Docker Image as tar
+        if: ${{ inputs.save-as-artifact }}
+        run: docker save -o ${{ steps.calculate-build-context-hash.outputs.image_name_no_slashes }}.tar ${{ inputs.repository }}/${{ inputs.image_name }}:${{ steps.calculate-build-context-hash.outputs.build_context_tag }}
+
+      - name: Upload Docker Image Artifact
+        if: ${{ inputs.save-as-artifact }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ${{ steps.calculate-build-context-hash.outputs.image_name_no_slashes }}
+          path: ${{ steps.calculate-build-context-hash.outputs.image_name_no_slashes }}.tar
+          if-no-files-found: error

@@ -9,4 +9,4 @@ sh .devcontainer/on-create-command-boilerplate.sh
 
 pre-commit install --install-hooks{% endraw %}{% if python_package_registry is not defined or python_package_registry == "PyPI" %}
 
-{% raw %}sh .devcontainer/manual-setup-deps.sh --optionally-lock{% endraw %}{% endif %}
+{% raw %}python .devcontainer/manual-setup-deps.py --optionally-check-lock{% endraw %}{% endif %}
