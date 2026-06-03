@@ -114,7 +114,7 @@ jobs:
       DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure.lib
       PULUMI_PREVIEW: true
       PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
-      PULUMI_UP: true
+      PULUMI_UP: ${{ github.ref == 'refs/heads/main' }}
       PULUMI_UP_ROLE_NAME: InfraDeploy--{% endraw %}{{ repo_name }}{% raw %}
       AWS_ACCOUNT_ID: "{% endraw %}{{ aws_production_account_id }}{% raw %}"
       SHOW_PREVIEW_COMMENT_ON_PR: ${{ github.event_name == 'pull_request' }}
