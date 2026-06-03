@@ -65,7 +65,7 @@ jobs:
       PULUMI_STACK_NAME: test-${{ needs.get-values.outputs.pr-short-num }}
       PYTHON_VERSION: {% endraw %}{{ python_version }}{% raw %}
       PROJECT_DIR: .
-      DEPLOY_SCRIPT_MODULE_NAME: src.cloud_courier_infrastructure.lib
+      DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure.lib
       PULUMI_PREVIEW: true
       PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
       PULUMI_UP_ROLE_NAME: InfraDeploy--{% endraw %}{{ repo_name }}{% raw %}
@@ -88,7 +88,7 @@ jobs:
       PULUMI_STACK_NAME: staging
       PYTHON_VERSION: {% endraw %}{{ python_version }}{% raw %}
       PROJECT_DIR: .
-      DEPLOY_SCRIPT_MODULE_NAME: src.cloud_courier_infrastructure.lib
+      DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure.lib
       PULUMI_PREVIEW: true
       PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
       PULUMI_UP: ${{ github.ref == 'refs/heads/main' }}
@@ -111,7 +111,7 @@ jobs:
       PULUMI_STACK_NAME: prod
       PYTHON_VERSION: {% endraw %}{{ python_version }}{% raw %}
       PROJECT_DIR: .
-      DEPLOY_SCRIPT_MODULE_NAME: src.cloud_courier_infrastructure.lib
+      DEPLOY_SCRIPT_MODULE_NAME: cloud_courier_infrastructure.lib
       PULUMI_PREVIEW: true
       PREVIEW_ROLE_NAME: InfraPreview--{% endraw %}{{ repo_name }}{% raw %}
       PULUMI_UP: true
