@@ -76,6 +76,21 @@ on:
         required: false
         default: ''
         type: string
+      DOWNLOAD_ARTIFACT_NAME:
+        description: 'Name of the artifact to download from the build job'
+        required: false
+        default: ''
+        type: string
+      DOWNLOAD_ARTIFACT_PATH:
+        description: 'Path to extract the downloaded artifact to'
+        required: false
+        default: ''
+        type: string
+      SHOW_PREVIEW_COMMENT_ON_PR:
+        description: 'Shows the pulumi preview details on the PR, note this is dependent on the pull_request event'
+        required: false
+        default: false
+        type: boolean
     secrets:
       iac-github-api-tokens:
         description: 'API tokens to use for Github IaC deployment when not using AWS Secrets Manager'
@@ -87,17 +102,19 @@ env:
   PRE_COMMIT_HOME: ${{ github.workspace }}/.precommit_cache
 
 permissions:
-    id-token: write
-    contents: write # needed for mutex
+  id-token: write # needed to assume OIDC roles (e.g. for downloading from CodeArtifact)
+  contents: write # needed for mutex
+  pull-requests: write # needed to post the preview on the PR as a comment
 
 jobs:
   pulumi:
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     env:
       IAC_GITHUB_API_TOKENS: ${{ secrets.iac-github-api-tokens }} # only used in non-enterprise situations when not using full fledged Secrets Manager
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
         with:
           ref: ${{ inputs.CHECKOUT_REF }}
 
@@ -106,11 +123,18 @@ jobs:
         with:
           python-version: ${{ inputs.PYTHON_VERSION }}
 
+      - name: Download Artifact
+        uses: actions/download-artifact@v7.0.0
+        if: ${{ inputs.DOWNLOAD_ARTIFACT_NAME != '' }}
+        with:
+          name: ${{ inputs.DOWNLOAD_ARTIFACT_NAME }}
+          path: ${{ inputs.DOWNLOAD_ARTIFACT_PATH }}
+
       - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
         uses: ben-z/gh-action-mutex@1ebad517141198e08d47cf72f3c0975316620a65 # v1.0.0-alpha.10
         with:
           branch: mutex-pulumi-${{ inputs.PULUMI_STACK_NAME }}-${{ inputs.ADDITIONAL_MUTEX_SUFFIX }}
-        timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
+        timeout-minutes: 15  # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
 
       - name: Pulumi Initial Destroy to cleanup any leftovers
         uses: ./.github/actions/pulumi_ephemeral_deploy
@@ -136,6 +160,7 @@ jobs:
           deploy-script-name: ${{ inputs.DEPLOY_SCRIPT_NAME }}
           aws-region: ${{ inputs.AWS_REGION }}
           aws-account-id: ${{ inputs.AWS_ACCOUNT_ID }}
+          show-preview-comment-on-pr: ${{ inputs.SHOW_PREVIEW_COMMENT_ON_PR }}
         timeout-minutes: 5 # apparently timeout-minutes only accepts literal values, it cannot evaluate expressions (e.g. workflow inputs)
 
       - name: Refresh

@@ -96,7 +96,7 @@ class OnPremNode(ComponentResource):
         )
         _ = RolePolicy(  # the native provider has some CloudControl error when the policy document had an output in it
             append_resource_suffix(f"{resource_name}-upload-data", max_length=100),
-            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            role=role.role_name,
             name="upload-data",
             policy=data_bucket_name.apply(
                 lambda bucket_name: get_policy_document(
@@ -122,7 +122,7 @@ class OnPremNode(ComponentResource):
         )
         _ = RolePolicy(  # the native provider gave some odd CloudControl error about the policy, even though it has no Outputs in it
             append_resource_suffix(f"{resource_name}-put-cloudwatch-metrics", max_length=100),
-            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            role=role.role_name,
             name="put-cloudwatch-metrics",
             policy=get_policy_document(
                 statements=[
@@ -145,7 +145,7 @@ class OnPremNode(ComponentResource):
         )
         _ = RolePolicy(  # the native provider gave some odd CloudControl error about the policy, even though it has no Outputs in it
             append_resource_suffix(f"{resource_name}-ssm-params", max_length=100),
-            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            role=role.role_name,
             name="ssm-params",
             policy=get_policy_document(
                 statements=[
@@ -164,7 +164,7 @@ class OnPremNode(ComponentResource):
         installed_agent_version_tag_key = "installed-cloud-courier-agent-version"  # Warning! This tag key is used in the Cloud Courier Agent, so changing it will require changes there as well
         _ = RolePolicy(  # the native provider gave some odd CloudControl error about the policy, even though it has no Outputs in it
             append_resource_suffix(f"{resource_name}-update-instance-tag", max_length=100),
-            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            role=role.role_name,
             name="update-instance-tag",
             policy=get_policy_document(
                 statements=[
@@ -199,7 +199,7 @@ class OnPremNode(ComponentResource):
         )
         _ = RolePolicy(  # the native provider has some CloudControl error when the policy document had an output in it
             append_resource_suffix(f"{resource_name}-create-ssm-logs", max_length=100),
-            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            role=role.role_name,
             name="create-ssm-logs",
             policy=ssm_logs_bucket_name.apply(
                 lambda bucket_name: get_policy_document(
@@ -257,14 +257,16 @@ class OnPremNode(ComponentResource):
                 append_resource_suffix(f"{lab_computer_config.resource_name}-{descriptor}", max_length=100),
                 name=f"{SSM_PARAMETER_PREFIX}/{alias}/folders/{descriptor}",
                 value=Output.all(data_bucket_name, folder_to_watch).apply(  # TODO: make these kwargs not args
-                    lambda args: args[1]
-                    .model_copy(
-                        update={
-                            "s3_bucket_name": args[0],
-                            "s3_key_prefix": f"{lab_computer_config.location.name.lower()}/{lab_computer_config.name.lower()}",
-                        }
+                    lambda args: (
+                        args[1]
+                        .model_copy(
+                            update={
+                                "s3_bucket_name": args[0],
+                                "s3_key_prefix": f"{lab_computer_config.location.name.lower()}/{lab_computer_config.name.lower()}",
+                            }
+                        )
+                        .model_dump_json()
                     )
-                    .model_dump_json()
                 ),
                 type=ssm.ParameterType.STRING,
                 tags=common_tags(),
@@ -282,7 +284,11 @@ class OnPremNode(ComponentResource):
             )
         ).apply(lambda result: len(result.ids) > 0)
         _ = has_been_activated.apply(
-            lambda been_activated: create_output_if_needed(  # it's a general anti-pattern to create resources inside an apply statement...but this is just a stack output, and I couldn't think of any other way
-                has_been_activated=been_activated, original_resource_name=original_resource_name, activation=activation
+            lambda been_activated: (
+                create_output_if_needed(  # it's a general anti-pattern to create resources inside an apply statement...but this is just a stack output, and I couldn't think of any other way
+                    has_been_activated=been_activated,
+                    original_resource_name=original_resource_name,
+                    activation=activation,
+                )
             )
         )

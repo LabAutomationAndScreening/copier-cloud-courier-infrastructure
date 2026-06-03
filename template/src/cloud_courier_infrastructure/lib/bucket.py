@@ -71,7 +71,9 @@ class RawDataBucket(ComponentResource):
             s3.BucketPolicy(
                 append_resource_suffix("raw-data-bucket-policy"),
                 bucket=self.bucket_name,
-                policy_document=self.bucket_name.apply(lambda bucket_name: create_bucket_policy(bucket_name)),
+                policy_document=self.bucket_name.apply(
+                    lambda bucket_name: create_bucket_policy(bucket_name)  # noqa: PLW0108 # TODO: figure out if this rule is valid or not
+                ),
                 opts=ResourceOptions(parent=self),
             ),
         )

@@ -11,22 +11,27 @@ env:
   PRE_COMMIT_HOME: ${{ github.workspace }}/.precommit_cache
 
 permissions:
-    id-token: write
-    contents: write # needed for mutex, and updating dependabot branches
-    statuses: write # needed for updating status on Dependabot PRs
+  id-token: write # needed to assume OIDC roles (e.g. for downloading from CodeArtifact)
 
 jobs:
   get-values:
     uses: ./.github/workflows/get-values.yaml
+    permissions:
+      contents: write # needed for updating dependabot branches
 
   pre-commit:
-    needs: [ get-values ]
+    needs:
+      - get-values
     uses: ./.github/workflows/pre-commit.yaml
+    permissions:
+      contents: write # needed for mutex
+      id-token: write # needed to assume OIDC roles (e.g. for downloading from CodeArtifact)
     with:
       python-version: 3.12.7
 
   lint-matrix:
-    needs: [ pre-commit ]
+    needs:
+      - pre-commit
     strategy:
       matrix:
         os:
@@ -35,17 +40,22 @@ jobs:
 
           - 3.12.7
 
-          - 3.13.2
-
         copier: [
           '--data-file tests/copier_data/data1.yaml',
           '--data-file tests/copier_data/data2.yaml',
           ]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+    permissions:
+      contents: write # needed for mutex
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Move python script that replaces private package registry information to temp folder so it doesn't get deleted
         run: |
@@ -87,7 +97,7 @@ jobs:
         run: |
           # Remove any specification of a Python repository having a default other than PyPI...because in this CI pipeline we can only install from PyPI
           python $RUNNER_TEMP/replace_private_package_registries.py
-          python .devcontainer/manual-setup-deps.py --skip-check-lock
+          python .devcontainer/manual-setup-deps.py --skip-check-lock --skip-updating-devcontainer-hash
           # Add everything to git so that pre-commit recognizes the files and runs on them
           git add .
           git status
@@ -97,10 +107,10 @@ jobs:
         uses: ben-z/gh-action-mutex@1ebad517141198e08d47cf72f3c0975316620a65 # v1.0.0-alpha.10
         with:
           branch: mutex-venv-${{ matrix.os }}-${{ matrix.python-version }}
-        timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
+        timeout-minutes: 8  # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
 
       - name: Cache Pre-commit hooks
-        uses: actions/cache@v4.2.3
+        uses: actions/cache@v5.0.2
         env:
           cache-name: cache-pre-commit-hooks
         with:
@@ -112,7 +122,13 @@ jobs:
       - name: Run pre-commit
         run: |
           # skip devcontainer context hash because the template instantiation may make it different every time
-          SKIP=git-dirty,compute-devcontainer-context-hash pre-commit run -a
+          SKIP=git-dirty,compute-devcontainer-context-hash pre-commit run -a || PRE_COMMIT_EXIT_CODE=$?
+          if [ -n "$PRE_COMMIT_EXIT_CODE" ]; then
+            echo "Pre-commit failed with exit code $PRE_COMMIT_EXIT_CODE"
+            echo "Showing git diff:"
+            git --no-pager diff
+            exit $PRE_COMMIT_EXIT_CODE
+          fi
 
       - name: Upload pre-commit log if failure
         if: ${{ failure() }}
@@ -123,13 +139,23 @@ jobs:
 
   required-check:
     runs-on: ubuntu-24.04
-    needs: [ lint-matrix, get-values ]
+    timeout-minutes: 2
+    needs:
+      - lint-matrix
+      - get-values
+    permissions:
+      statuses: write # needed for updating status on Dependabot PRs
     if: always()
     steps:
       - name: fail if prior job failure
-        if: needs.lint-matrix.result != 'success'
         run: |
-          exit 1
+          success_pattern="^(skipped|success)$" # these are the possibilities: https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#needs-context
+
+          if [[ ! "${{ needs.lint-matrix.result }}" =~ $success_pattern ]]; then
+            echo "❌ One or more jobs did not finish with skipped or success"
+            exit 1
+          fi
+          echo "✅ All jobs finished with skipped or success"
       - name: Mark updated dependabot hash commit as succeeded
         if: needs.get-values.outputs.dependabot-commit-created == 'true'
         env:

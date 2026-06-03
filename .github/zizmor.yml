@@ -1,0 +1,5 @@
+rules:
+  template-injection:
+    ignore:
+      # this is just echo-ing out the github context to be visible for debugging, it's not executing commands
+      - get-values.yaml:28
