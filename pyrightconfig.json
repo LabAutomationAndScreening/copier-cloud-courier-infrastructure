@@ -1,7 +1,6 @@
 {
   "exclude": [
     // excludes managed by this repository
-
     "**/template/**", // without the dependencies of the template installed, running pyright on them within the copier template is not useful
 
     // excludes managed by template
