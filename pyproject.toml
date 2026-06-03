@@ -5,15 +5,20 @@ description = "Infrastructure for Cloud Courier"
 readme = "README.md"
 requires-python = ">=3.12.7"
 dependencies = [
-    # Managed by upstream template
-    "pytest>=8.4.1",
-    "pytest-cov>=6.2.1",
-    "pytest-randomly>=3.16.0",
-    "pyright[nodejs]>=1.1.403",
-    "copier>=9.8.0",
-    "copier-template-extensions>=0.3.2"
-
     # Specific to this template
 
 
+    # Managed by upstream template
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "pytest-randomly>=4.1.0",
+    "pyright[nodejs]>=1.1.409",
+    "ty>=0.0.40",
+    "copier==9.15.1",
+    "copier-template-extensions==0.3.3"
 ]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple/"
+exclude-newer = "1 day"

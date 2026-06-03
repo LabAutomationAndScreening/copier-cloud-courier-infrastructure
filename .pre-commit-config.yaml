@@ -1,4 +1,4 @@
-minimum_pre_commit_version: 4.0.1
+minimum_pre_commit_version: 4.3.0
 # run `pre-commit autoupdate --freeze` to update all hooks
 default_install_hook_types: [pre-commit, post-checkout]
 repos:
@@ -42,38 +42,38 @@ repos:
 
   # Reformatting (should generally come before any file format or other checks, because reformatting can change things)
   - repo: https://github.com/crate-ci/typos
-    rev: 392b78fe18a52790c53f42456e46124f77346842  # frozen: v1.34.0
+    rev: 359573a3ff38f71c93e160f2ace96d118f6ff42e  # frozen: v1
     hooks:
       - id: typos
-        exclude:
-          |
+        exclude: |
           (?x)^(
               .*\.min.js|
               .*\.min.css|
               .*\.umd.js|
           )$
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b # frozen: v5.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
     hooks:
       - id: trailing-whitespace
-        exclude:
-          |
+        exclude: |
           (?x)^(
               .*/vendor_files/.*|
+              .*tests/.*/__snapshots__/.*|
+              .*/generated/open[-_]api/.*|
           )$
       - id: end-of-file-fixer
         # the XML formatter hook doesn't leave a blank line at the end, so excluding XML files from this hook to avoid conflicts
-        exclude:
-          | # the extra trailing newline in the pull request template makes it easier to click there in the github console. The CLI that programmatically generates devcontainer-lock.json always ends the file incompatible with this hook.
+        exclude: | # the extra trailing newline in the pull request template makes it easier to click there in the github console. The CLI that programmatically generates devcontainer-lock.json always ends the file incompatible with this hook.
           (?x)^(
-              .github/pull_request_template.md|
-              template/.github/pull_request_template.md|
-              template/.copier-answers.yml.jinja-base|
-              template/template/.copier-answers.yml.jinja|
-              template/.copier-answers.yml.jinja|
+              \.github/pull_request_template.md|
+              template/\.github/pull_request_template.md|
+              .*generated/graphql.ts|
+              .*/generated/open[-_]api/.*|
+              .*tests/.*/__snapshots__/.*|
               .devcontainer/devcontainer-lock.json|
-              .copier-answers.yml|
+              .*\.copier-answers\.yml(\.jinja(-base)?)?|
               .*\.xml|
+              .*\.svg|
               .*/vendor_files/.*|
           )$
       - id: pretty-format-json
@@ -85,6 +85,8 @@ repos:
               .*pyrightconfig.json|
               .*tsconfig.json|
               .*biome.jsonc|
+              .*/generated/open[-_]api/.*|
+              .*tests/.*/__snapshots__/.*|
               .*/vendor_files/.*|
           )$
         args: [--autofix, --no-sort-keys]
@@ -97,12 +99,13 @@ repos:
         exclude: |
           (?x)^(
               .*generated/graphql.ts|
+              .*/generated/open[-_]api/.*|
               .*/schema.graphql|
               .*pyrightconfig\.json|
           )$
 
-  - repo: https://github.com/pre-commit/mirrors-prettier # TODO: switch to a different approach...this was archived in 2024
-    rev: f12edd9c7be1c20cfa42420fd0e6df71e42b51ea # frozen: v4.0.0-alpha.8
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: 515f543f5718ebfd6ce22e16708bb32c68ff96e1  # frozen: v3.8.3
     hooks:
       - id: prettier
         # TODO: get template YAML and MD files more in line with prettier expectations so we can start using prettier on those too
@@ -123,34 +126,27 @@ repos:
               .*.jsonc|
               .*/vendor_files/.*|
               .*/schema.graphql|
+              .*/generated/open[-_]api/.*|
               .*generated/graphql.ts|
+              template/.*|
           )$
         files: (.*.json)|(.*.ts)|(.*.jsx)|(.*.tsx)|(.*.yaml)|(.*.yml)|(.*.md)|(.*.html)|(.*.css)|(.*.scss)|(.*.less)|(.*.vue)|(.*.graphql)|(.*.gql)
 
-  - repo: https://github.com/myint/docformatter
-    # black seems to be working on formatting docstrings, but use this for now
-    rev: e73b8ba0c1316be565983236c72e653ad44e6b66  # frozen: v1.7.7
-    hooks:
-      - id: docformatter
-        exclude: (tests*)|(exceptions\.py)|(warnings\.py)
-        args:
-          - --in-place
-          - --wrap-summaries=150
-          - --wrap-descriptions=150
 
   - repo: https://github.com/pamoller/xmlformatter
-    rev: 47ae0fb9cf2a515f8a2666050fac66fd719ae530 # frozen: v0.2.8
+    rev: bf91234ba2949363eec3429c4ecc2b39a9e8bfce  # frozen: v0.2.9
     hooks:
       - id: xml-formatter
         exclude: |
           (?x)^(
               .*/__snapshots__/.*|
               .*/vendor_files/.*|
+              .*\.svg|
           )$
 
   # Invalid File Checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b # frozen: v5.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
     hooks:
       - id: check-added-large-files
         args: ["--maxkb=123"]
@@ -168,17 +164,24 @@ repos:
       - id: check-yaml
         # .copier-answers.yml is an autogenerated YAML file by Copier that throws 'found unhashable key' errors
         # Helm charts contain other non-YAML markers that cause errors here. they should be checked with helm-lint instead
+        # VCRpy cassettes sometimes contain non-YAML markers that cause errors---but they're autogenerated anyway
         exclude: |
           (?x)^(
-              .copier-answers.yml|
-              (.*/helm/.*)|
+              (.*\.copier-answers\.yml)|
+              (.*/?helm/.*)|
+              (.*/tests/unit/.*/?cassettes/.*)|
           )$
       - id: check-xml
       - id: check-merge-conflict
       - id: check-case-conflict
 
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 943377262562a12b57292fc98fabd7dbf81451fe  # frozen: 0.37.2
+    hooks:
+      - id: check-github-workflows
+
   - repo: https://github.com/maresb/check-json5
-    rev: 893a2b5a0a27c3540bd8fcafe2968ccc05237179 # 1.0
+    rev: bd4737432a2175617a9eeaa510ab369cbc1cbd3d  # frozen: v1.0.1
     hooks:
       - id: check-json5
         files: |
@@ -200,9 +203,14 @@ repos:
 
   # Safety/Security Issues
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b # frozen: v5.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
     hooks:
       - id: detect-private-key
+
+  # - repo: https://github.com/woodruffw/zizmor-pre-commit # TODO: implement this: https://github.com/LabAutomationAndScreening/copier-base-template/issues/95
+  #   rev: b933184438555436e38621f46ceb0c417cbed400  # frozen: v1.13.0
+  #   hooks:
+  #     - id: zizmor
 
   # Linting
 
@@ -214,7 +222,7 @@ repos:
         exclude: docs/.*\.rst$
 
   - repo: https://github.com/hadolint/hadolint
-    rev: c3dc18df7a501f02a560a2cc7ba3c69a85ca01d3 # frozen: v2.13.1-beta
+    rev: 4e697ba704fd23b2409b947a319c19c3ee54d24f  # frozen: v2.14.0
     hooks:
       - id: hadolint-docker
         name: Lint Dockerfiles
@@ -222,27 +230,50 @@ repos:
         description: Runs hadolint to lint Dockerfiles
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 3d44372123ca5e8617fdb65d9f11facd159b9e95  # frozen: v0.12.3
+    rev: 6fec9b7edb08fd9989088709d864a7826dc74e80  # frozen: v0.15.12
     hooks:
       - id: ruff
         name: ruff-src
         args: [--fix, --config=./ruff.toml]
         files: src/.+\.py$
+        exclude: |
+          (?x)^(
+              .*/generated/graphql/.*|
+              .*/generated/open[-_]api/.*|
+              template/.*|
+          )$
       - id: ruff
-        name: ruff-tests
-        args: [--fix, --config=./ruff-test.toml]
-        files: tests?/.+\.py$
+        name: ruff-non-src # tests, scripts and other non-source code
+        args: [--fix, --config=./ruff-non-src.toml]
+        files: ^(?!src/)(?!.+/src/).+\.py$
+        exclude: |
+          (?x)^(
+              .*/generated/graphql/.*|
+              .*/generated/open[-_]api/.*|
+              template/.*|
+          )$
       - id: ruff-format
+        exclude: |
+          (?x)^(
+              .*/generated/graphql/.*|
+              .*/generated/open[-_]api/.*|
+          )$
 
   - repo: https://github.com/pylint-dev/pylint
-    rev: f798a4a3508bcbb8ad0773ae14bf32d28dcfdcbe  # frozen: v3.3.7
+    rev: 88e1ab7545a4af4aea15c305a154c164a95ab842  # frozen: v4.0.5
     hooks:
       - id: pylint
         name: pylint
+        # exclude the template files---duplication within them will be discovered during CI of that template instantiation
+        exclude: |
+          (?x)^(
+              .*/generated/graphql/.*|
+              .*/generated/open[-_]api/.*|
+              template/.*|
+          )$
         args:
           - --rcfile=./pylintrc.toml
         verbose: true
-        exclude: ^template/.* # exclude the template files---duplication within them will be discovered during CI of that template instantiation
 
   - repo: local
     hooks:
@@ -250,6 +281,11 @@ repos:
         name: pyright
         entry: bash -c "uv run pyright"
         files: '.+\.py$'
+        exclude: |
+          (?x)^(
+              .*/generated/graphql/.*|
+              .*/generated/open[-_]api/.*|
+          )$
         # don't pass filenames else the command line sees them twice
         pass_filenames: false
         language: system
@@ -259,10 +295,19 @@ repos:
         # print the number of files as a sanity-check
         verbose: true
 
-  # Devcontainer context --- this makes Github's "prebuild codespaces" feature work more intelligently for the "Configuration Change" trigger
+  # Updating repo config/tooling files
   - repo: local
     hooks:
+      - id: merge-claude-settings
+        # Keep Claude's settings.json synced with the JSON5 files. It's only for local development, so don't run it in CI
+        name: merge Claude settings
+        entry: bash -c '[[ "${GITHUB_ACTIONS:-}" == "true" || "${CI:-}" == "true" ]] && exit 0; bash .claude/helpers/merge-claude-settings.sh'
+        files: ^\.claude/settings/.*\.(json|jsonc)$
+        pass_filenames: false
+        language: system
+
       - id: compute-devcontainer-context-hash
+        # Devcontainer context --- this makes Github's "prebuild codespaces" feature work more intelligently for the "Configuration Change" trigger
         name: compute devcontainer context hash
         entry: bash -c "python3 .github/workflows/hash_git_files.py . --for-devcontainer-config-update"
         files: (.*.lock)|(.*pnpm-lock.yaml)|(.*hash_git_files.py)|(.devcontainer/.*)|(\.pre-commit-config.yaml)

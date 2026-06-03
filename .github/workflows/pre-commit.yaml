@@ -22,38 +22,47 @@ env:
   PRE_COMMIT_HOME: ${{ github.workspace }}/.precommit_cache
 
 permissions:
-    contents: write # needed for mutex
+  contents: write # needed for mutex
+  id-token: write # needed to assume OIDC roles (e.g. for downloading from CodeArtifact)
 
 jobs:
   pre-commit:
     runs-on: ubuntu-24.04
+    timeout-minutes: 8
     name: Pre-commit
     steps:
       - name: Checkout code during push
         if: ${{ github.event_name == 'push' }}
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
         with:
           ref: ${{ github.ref_name }} # explicitly get the head of the branch, which will include any new commits pushed if this is a dependabot branch
+          persist-credentials: false
 
       - name: Checkout code not during push
         if: ${{ github.event_name != 'push' }}
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Install latest versions of packages
         uses: ./.github/actions/install_deps
+        env:
+          SKIP_PLAYWRIGHT_INSTALL: "1"
         with:
           python-version: ${{ inputs.python-version }}
           node-version: ${{ inputs.node-version }}
+          skip-installing-ssm-plugin-manager: true
+          skip-installing-pulumi-cli: true
 
       - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
         if: ${{ runner.os != 'Windows' }} # we're just gonna have to YOLO on Windows, because this action doesn't support it yet https://github.com/ben-z/gh-action-mutex/issues/14
         uses: ben-z/gh-action-mutex@1ebad517141198e08d47cf72f3c0975316620a65 # v1.0.0-alpha.10
         with:
           branch: mutex-venv-ubuntu-24.04-py${{ inputs.python-version }}-nodejs-${{ inputs.node-version }}
-        timeout-minutes: 30 # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
+        timeout-minutes: 8  # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
 
       - name: Cache Pre-commit hooks
-        uses: actions/cache@v4.2.3
+        uses: actions/cache@v5.0.5
         env:
           cache-name: cache-pre-commit-hooks
         with:
@@ -63,4 +72,11 @@ jobs:
             ubuntu-24.04-py${{ inputs.python-version }}-node-${{ inputs.node-version}}-${{ env.cache-name }}-
 
       - name: Run pre-commit
-        run:  pre-commit run -a
+        run: |
+          pre-commit run -a || PRE_COMMIT_EXIT_CODE=$?
+          if [ -n "$PRE_COMMIT_EXIT_CODE" ]; then
+            echo "Pre-commit failed with exit code $PRE_COMMIT_EXIT_CODE"
+            echo "Showing git diff:"
+            git --no-pager diff
+            exit $PRE_COMMIT_EXIT_CODE
+          fi

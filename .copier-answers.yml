@@ -1,16 +1,22 @@
 # Changes here will be overwritten by Copier
-_commit: v0.0.60
+_commit: v0.0.130
 _src_path: gh:LabAutomationAndScreening/copier-base-template.git
+copier_answers_directory: .
 description: Infrastructure for Cloud Courier
+install_claude_cli: true
 python_ci_versions:
 - 3.12.7
-- 3.13.2
+- 3.13.9
 python_version: 3.12.7
 repo_name: copier-cloud-courier-infrastructure
 repo_org_name: LabAutomationAndScreening
+repo_org_name_for_copyright: LabAutomationAndScreening
 ssh_port_number: 52369
 template_might_want_to_install_aws_ssm_port_forwarding_plugin: false
-template_uses_javascript: false
+template_might_want_to_use_python_asyncio: false
+template_might_want_to_use_vcrpy: false
+template_publishes_releases: false
 template_uses_pulumi: true
 template_uses_python: true
+template_uses_typescript: false
 

@@ -1,3 +1,8 @@
+# Questions specific to this template
+
+
+
+
 # Questions managed by upstream template
 repo_name:
     type: str
@@ -11,6 +16,11 @@ description:
     type: str
     help: What is the description of this repository?
 
+install_claude_cli:
+    type: bool
+    help: Should the Claude CLI be installed in the devcontainer?
+    default: no
+
 is_open_source:
     type: bool
     help: Is this library open source?
@@ -22,10 +32,16 @@ ssh_port_number:
     # Pick a random port, but ensure it's not in the excluded port range on Windows (powershell: `netsh int ipv4 show excludedportrange protocol=tcp`)
     default: "{{ ( (range(49152, 49752)   | list) + (range(49852, 50000)   | list) + (range(50060, 50160)   | list) + (range(50160, 50260)   | list) + (range(50260, 50360)   | list) + (range(50914, 51014)   | list) + (range(51114, 51214)   | list) + (range(51214, 51314)   | list) + (range(51314, 51414)   | list) + (range(51623, 51723)   | list) + (range(51723, 51823)   | list) + (range(65269, 65369)   | list) + (range(65369, 65469)   | list) ) | random }}"
 
+pull_from_ecr:
+    type: bool
+    help: Will you need to pull images from a central AWS Elastic Container Registry?
+    default: no
+
 use_windows_in_ci:
     type: bool
     help: Should CI in the instantiated template also use Windows runners?
     default: no
+
 
 
 python_version:
@@ -45,24 +61,24 @@ python_package_registry:
 aws_identity_center_id:
     type: str
     help: What's the ID of your Organization's AWS Identity center, e.g. d-9145c20053?
-    when: "{{ python_package_registry == 'AWS CodeArtifact' or True }}"
+    when: "{{ python_package_registry == 'AWS CodeArtifact' or install_aws_ssm_port_forwarding_plugin or pull_from_ecr or True }}"
 
 aws_org_home_region:
     type: str
     help: What is the home region of the AWS Organization (where all of the central infrastructure is deployed)?
     default: us-east-1
-    when: "{{ python_package_registry == 'AWS CodeArtifact' or True }}"
+    when: "{{ python_package_registry == 'AWS CodeArtifact' or install_aws_ssm_port_forwarding_plugin or pull_from_ecr or True }}"
 
 aws_central_infrastructure_account_id:
     type: str
     help: What's the ID of your Organization's AWS Account containing Central Infrastructure (e.g. CodeArtifact)?
-    when: "{{ python_package_registry == 'AWS CodeArtifact' }}"
+    when: "{{ python_package_registry == 'AWS CodeArtifact' or pull_from_ecr }}"
     default: "000000000000"
 
 core_infra_base_access_profile_name:
     type: str
     help: What's the AWS Identity Center Profile name for base access to the Central Infrastructure account (i.e. to read from CodeArtifact)?
-    when: "{{ python_package_registry == 'AWS CodeArtifact' }}"
+    when: "{{ python_package_registry == 'AWS CodeArtifact' or pull_from_ecr }}"
     default: CoreInfraBaseAccess
 
 
@@ -101,14 +117,58 @@ aws_region_for_stack:
 
 
 # Questions specific to this template
-
 automatically_obtain_executable_from_github:
     type: bool
     help: Do you want to automatically download the Cloud Courier Agent executable from Github Releases (vs manually upload it into an S3 bucket yourself)?
     default: yes
 
+
+# Questions managed by upstream template
+
+repo_names_for_codespaces_read_permissions:
+    type: str
+    help: Provide a comma-separated list of repository names only within this GitHub organization that you would like the codespace to have read access to (for example, private-template, not my-org/private-template)
+    default: ""
+
+
+_tasks:
+  - command: |
+        python3 '{{ _copier_conf.src_path }}/src/copier_tasks/remove_precommit_hooks.py' \
+            --hook-id-regex '^\s*-\s+id:\s+merge-claude-settings\s*$' \
+            --target-file .pre-commit-config.yaml
+    when: "{{ not install_claude_cli }}"
+  # Copier does not preserve executable permissions when instantiating the template, so we set them explicitly here.
+  # git update-index is also needed because with core.fileMode=false (common on WSL2) git ignores the on-disk exec bit,
+  # so a plain `git add` would not capture it. It is guarded on the file being tracked, since on an initial `copier copy`
+  # into a fresh repo the file is not in the index yet (the chmod alone covers that case).
+  - command: |
+        if [ -f scripts/delete_false_positive_rej.py ]; then
+            chmod +x scripts/delete_false_positive_rej.py
+            if git ls-files --error-unmatch scripts/delete_false_positive_rej.py > /dev/null 2>&1; then
+                git update-index --chmod=+x scripts/delete_false_positive_rej.py
+            fi
+        fi
+  - command: |
+        for script in .claude/skills/address-pr-comments/check-footer.py .claude/skills/address-pr-comments/fetch-pr-comments.py .claude/skills/address-pr-comments/post-reply.py; do
+            if [ -f "$script" ]; then
+                chmod +x "$script"
+                if git ls-files --error-unmatch "$script" > /dev/null 2>&1; then
+                    git update-index --chmod=+x "$script"
+                fi
+            fi
+        done
+  - command: |
+        if [ -f ruff.toml ]; then
+            echo "Updating ruff target-version from python_version..."
+            py_major_minor="$(printf '%s' '{{ python_version }}' | cut -d. -f1,2)"
+            py_tag="py$(printf '%s' "$py_major_minor" | tr -d '.')"
+            sed -i -E 's/^target-version = "py[0-9]+"/target-version = "'"$py_tag"'"/' ruff.toml
+        else
+            echo "ruff.toml not found; skipping Ruff target-version update."
+        fi
+
 # Additional Settings
-_min_copier_version: "9.4"
+_min_copier_version: "9.8"
 
 _subdirectory: template
 

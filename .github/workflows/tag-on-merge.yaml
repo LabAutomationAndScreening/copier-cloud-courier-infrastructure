@@ -10,14 +10,16 @@ jobs:
   create-tag:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-24.04
+    timeout-minutes: 2
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.2
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: '0'
+          persist-credentials: false
       - name: Bump version and push tag
-        uses: mathieudutour/github-tag-action@v6.2
+        uses: nickkostov/github-tag-action@b3aa34b4ac9c7843ee609ba5d0b0a50b962647b9 # v1.3.0 # a fork of https://github.com/mathieudutour/github-tag-action, which is still on Node 20
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

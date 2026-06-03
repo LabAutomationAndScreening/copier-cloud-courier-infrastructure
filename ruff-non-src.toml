@@ -1,0 +1,26 @@
+extend = "./ruff.toml"
+
+[lint]
+ignore = [
+    "D100", # no module docstrings needed for tests
+    "D101", # no class docstrings needed for tests
+    "D102", # no method docstrings needed for tests
+    "D103", # no function docstrings needed for tests
+    "D104", # no package docstrings needed for tests
+    "FBT001", # booleans are often used in parametrized test cases as positional arguments, and test function argument specifications cannot usually easily include keyword arguments anyway
+    "N802", # test function naming conventions differ from source code
+    "S101", # assert is definitely needed in test cases
+    "S311", # pseudo-randomness is fine for test cases
+    "TID252", # sometimes you can't use absolute imports in test cases for importing things within the tests, because they're not a true package or have conflicting namespaces
+    "TRY003", # tests don't need to create custom exception classes, generally you want to throw an AssertionError with a message anyway
+]
+
+unfixable = [
+    "SIM117", # pytest.raises context managers should generally be separate from others so they can be very specific about where the error is being raised from, so don't autofix this
+]
+
+[lint.extend-per-file-ignores]
+"!**/tests/**" = ["INP001"] # non-test files aren't part of a package
+
+[lint.flake8-pytest-style]
+raises-require-match-for = ["*"] # ensures we always have a match for our raises statements so that we validate tests fail for the right reason
