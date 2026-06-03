@@ -144,10 +144,10 @@ jobs:
 
           if [[ ! "${{ needs.check-skip-duplicate.result }}" =~ $success_pattern ]] ||
             [[ ! "${{ needs.pre-commit.result }}" =~ $success_pattern ]] ||
-            [[ ! "${{ needs.confirm-on-tagged-copier-template.result }}" =~ $success_pattern ]]; then
             [[ ! "${{ needs.ephemeral-test.result }}" =~ $success_pattern ]] ||
             [[ ! "${{ needs.pulumi-staging.result }}" =~ $success_pattern ]] ||
-            [[ ! "${{ needs.pulumi-prod.result }}" =~ $success_pattern ]]; then
+            [[ ! "${{ needs.pulumi-prod.result }}" =~ $success_pattern ]] ||
+            [[ ! "${{ needs.confirm-on-tagged-copier-template.result }}" =~ $success_pattern ]]; then
             echo "❌ One or more jobs did not finish with skipped or success"
             exit 1
           fi
