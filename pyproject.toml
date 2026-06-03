@@ -9,11 +9,16 @@ dependencies = [
 
 
     # Managed by upstream template
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
-    "pytest-randomly>=4.0.1",
-    "pyright[nodejs]>=1.1.408",
-    "ty>=0.0.17",
-    "copier==9.11.3",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "pytest-randomly>=4.1.0",
+    "pyright[nodejs]>=1.1.409",
+    "ty>=0.0.40",
+    "copier==9.15.1",
     "copier-template-extensions==0.3.3"
 ]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple/"
+exclude-newer = "1 day"

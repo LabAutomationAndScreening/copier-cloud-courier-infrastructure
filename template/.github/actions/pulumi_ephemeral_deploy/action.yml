@@ -73,29 +73,47 @@ runs:
       shell: bash
 
     - name: AWS OIDC
-      uses: aws-actions/configure-aws-credentials@v5.1.1
+      uses: aws-actions/configure-aws-credentials@v6.1.0
       with:
         role-to-assume: arn:aws:iam::${{ inputs.aws-account-id }}:role/${{ inputs.aws-role-name }}
         aws-region: ${{ inputs.aws-region }}
 
     - name: Run CLI
-      # apparently getting the stdout is nigh impossible in GHA, so this action helps
-      uses: mathiasvr/command-output@34408ea3d0528273faff3d9e201761ae96106cd0 # ratchet:mathiasvr/command-output@v2.0.0
-      id: pulumi-run
-      with:
-        # can't use working-directory with this action, so specifying it in the uv command
-        run: uv --directory ${{ github.workspace }}/${{ inputs.project-dir }} run python -m ${{ inputs.deploy-script-module-name }}.${{ inputs.deploy-script-name }} --stack=${{ inputs.stack-name }} ${{ inputs.cli-action }}
-        shell: bash
+      run: |
+        tmp_output=$(mktemp)
+        uv --directory ${{ github.workspace }}/${{ inputs.project-dir }} run python -m ${{ inputs.deploy-script-module-name }}.${{ inputs.deploy-script-name }} --stack=${{ inputs.stack-name }} ${{ inputs.cli-action }} 2>&1 | tee "$tmp_output"
+        output=$(cat "$tmp_output")
+
+        header=":eyes: **Pulumi Preview for ${{ inputs.deploy-script-module-name }} stack ${{ inputs.stack-name }}:** :eyes:"
+
+        cat > /tmp/pulumi-preview-comment.md << EOF
+        $header
+
+        \`\`\`bash
+        $output
+        \`\`\`
+        EOF
+
+        if [ $(wc -c < /tmp/pulumi-preview-comment.md) -gt 65535 ]; then
+          resources_section=$(echo "$output" | sed -n '/^Resources:/,$p')
+          cat > /tmp/pulumi-preview-comment.md << EOF
+        $header
+
+        Output was too long to display here. Resources summary:
+
+        \`\`\`bash
+        $resources_section
+        \`\`\`
+
+        [View the full output in the Actions run.](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        EOF
+        fi
+      shell: bash
 
     - name: Comment the Preview on the Pull Request
       if: ${{ inputs.show-preview-comment-on-pr == 'true' }}
       # pin this sha (v3.0.1) for extra security since this action has some permissions to write to the pull request comments
       uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b
       with:
-        message: |
-          :eyes: **Pulumi Preview for ${{ inputs.deploy-script-module-name }} stack ${{ inputs.stack-name }}:** :eyes:
-
-          ```bash
-          ${{ steps.pulumi-run.outputs.stdout }}
-          ```
+        file-path: /tmp/pulumi-preview-comment.md
         comment-tag: previewonpr-${{ inputs.deploy-script-module-name }}-${{ inputs.stack-name }}

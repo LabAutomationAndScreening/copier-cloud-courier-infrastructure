@@ -1,4 +1,8 @@
 {% raw %}{
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb"
+  },
   "dockerComposeFile": "docker-compose.yml",
   "service": "devcontainer",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
@@ -12,21 +16,23 @@
     "ghcr.io/devcontainers/features/aws-cli:1.1.2": {
       // https://github.com/devcontainers/features/blob/main/src/aws-cli/devcontainer-feature.json
       // view latest version https://raw.githubusercontent.com/aws/aws-cli/v2/CHANGELOG.rst
-      "version": "2.32.6",
-    },{% endraw %}{% endif %}{% raw %}
+      "version": "2.34.34"
+    },{% endraw %}{% endif %}{% raw %}{% endraw %}{% if (is_child_of_copier_base_template is defined and is_child_of_copier_base_template is sameas(true)) or (is_child_of_copier_base_template is not defined and template_uses_python is defined and template_uses_python is sameas(true)) %}{% raw %}
     "ghcr.io/devcontainers/features/python:1.8.0": {
       // https://github.com/devcontainers/features/blob/main/src/python/devcontainer-feature.json
       "version": "{% endraw %}{{ python_version }}{% raw %}",
       "installTools": false,
-      "optimize": true
-    }{% endraw %}{% if is_child_of_copier_base_template is not defined and template_uses_javascript is defined and template_uses_javascript is sameas(true) %}{% raw %},
-    "ghcr.io/devcontainers/features/node:1.7.1": {
+      "optimize": true{% endraw %}{% if deploy_as_executable is defined and deploy_as_executable is sameas(true) %}{% raw %},
+      "enableShared": true{% endraw %}{% endif %}{% raw %}
+    },{% endraw %}{% endif %}{% raw %}{% endraw %}{% if is_child_of_copier_base_template is not defined and template_uses_typescript is defined and template_uses_typescript is sameas(true) %}{% raw %}
+    "ghcr.io/devcontainers/features/node:2.0.0": {
       // https://github.com/devcontainers/features/blob/main/src/node/devcontainer-feature.json
       "version": "{% endraw %}{{ node_version }}{% raw %}",
-      "pnpmVersion": "{% endraw %}{{ pnpm_version }}{% raw %}"
-    }{% endraw %}{% endif %}{% raw %}{% endraw %}{% if install_claude_cli %}{% raw %},
+      "pnpmVersion": "{% endraw %}{{ pnpm_version }}{% raw %}",
+      "nvmVersion": "{% endraw %}{{ nvm_version }}{% raw %}",
+    },{% endraw %}{% endif %}{% raw %}{% endraw %}{% if install_claude_cli %}{% raw %}
     // https://github.com/anthropics/devcontainer-features/blob/main/src/claude-code/devcontainer-feature.json
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0.5": {}{% endraw %}{% endif %}{% raw %}
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0.5": {},{% endraw %}{% endif %}{% raw %}
   },
   "customizations": {
     "vscode": {
@@ -35,52 +41,59 @@
         "-AmazonWebServices.aws-toolkit-vscode", // the AWS CLI feature installs this automatically, but it's causing problems in VS Code{% endraw %}{% endif %}{% raw %}
         // basic tooling
         // "eamodio.gitlens@15.5.1",
-        "coderabbit.coderabbit-vscode@0.17.0",
+        "coderabbit.coderabbit-vscode@0.19.2",
         "ms-vscode.live-server@0.5.2025051301",
         "MS-vsliveshare.vsliveshare@1.0.5905",
         "github.copilot@1.388.0",
-        "github.copilot-chat@0.38.2026022001",{% endraw %}{% if install_claude_cli %}{% raw %}
-        "anthropic.claude-code@2.1.49",{% endraw %}{% endif %}{% raw %}
+        "github.copilot-chat@0.44.2",{% endraw %}{% if install_claude_cli %}{% raw %}
+        "anthropic.claude-code@2.1.145",{% endraw %}{% endif %}{% raw %}{% endraw %}{% if (is_child_of_copier_base_template is defined and is_child_of_copier_base_template is sameas(true)) or (is_child_of_copier_base_template is not defined and template_uses_python is defined and template_uses_python is sameas(true)) %}{% raw %}
 
         // Python
-        "ms-python.python@2026.2.2026021801",
-        "ms-python.vscode-pylance@2026.1.1",
+        "ms-python.python@2026.5.2026032701",
+        "ms-python.vscode-pylance@2026.2.100",
         "ms-vscode-remote.remote-containers@0.414.0",
-        "charliermarsh.ruff@2026.36.0",
+        "charliermarsh.ruff@2026.44.0",{% endraw %}{% endif %}{% raw %}
 {% endraw %}{% if is_child_of_copier_base_template is not defined and template_uses_vuejs is defined and template_uses_vuejs is sameas(true) %}{% raw %}
         // VueJS
-        "vue.volar@3.2.1",
+        "vue.volar@3.2.5",
         "vitest.explorer@1.36.0",
-{% endraw %}{% endif %}{% raw %}{% endraw %}{% if is_child_of_copier_base_template is not defined and template_uses_javascript is defined and template_uses_javascript is sameas(true) %}{% raw %}
+{% endraw %}{% endif %}{% raw %}{% endraw %}{% if is_child_of_copier_base_template is not defined and template_uses_typescript is defined and template_uses_typescript is sameas(true) %}{% raw %}
         // All javascript
-        "dbaeumer.vscode-eslint@3.0.21",
+        "dbaeumer.vscode-eslint@3.0.24",
 {% endraw %}{% endif %}{% raw %}
         // Misc file formats
         "bierner.markdown-mermaid@1.29.0",
         "samuelcolvin.jinjahtml@0.20.0",
         "tamasfe.even-better-toml@0.19.2",
         "emilast.LogFileHighlighter@3.3.3",
-        "esbenp.prettier-vscode@12.3.0"
+        "esbenp.prettier-vscode@12.4.0"
       ],
       "settings": {
         "editor.accessibilitySupport": "off", // turn off sounds
         "extensions.autoUpdate": false,
         "extensions.autoCheckUpdates": false,
         "livePreview.portNumber": 3025, // arbitrary not to conflict with default 3000 Nuxt port number
-        "github.copilot.nextEditSuggestions.allowWhitespaceOnlyChanges": false,
+        "github.copilot.nextEditSuggestions.allowWhitespaceOnlyChanges": false,{% endraw %}{% if (is_child_of_copier_base_template is defined and is_child_of_copier_base_template is sameas(true)) or (is_child_of_copier_base_template is not defined and template_uses_python is defined and template_uses_python is sameas(true)) %}{% raw %}
         "[python]": {
           "editor.formatOnSave": true,
           "editor.defaultFormatter": "charliermarsh.ruff"
         },
         "ruff.nativeServer": "on",
         // TODO: see if there's a way to specify different configurations for different folders
-        "ruff.configuration": "/workspaces/{% endraw %}{{ repo_name }}{% raw %}/ruff-test.toml", // use the test configuration since it's less restrictive and won't show false positives and underline things
+        "ruff.configuration": "/workspaces/{% endraw %}{{ repo_name }}{% raw %}/ruff-non-src.toml", // use the non-src configuration since it's less restrictive and won't show false positives and underline things{% endraw %}{% endif %}{% raw %}
         "[jsonc][json][javascript][typescript][graphql][css][scss][html][vue]": {
           "editor.defaultFormatter": "esbenp.prettier-vscode",
           "editor.formatOnSave": true
         }
       }
-    }
+    },{% endraw %}{% if repo_names_for_codespaces_read_permissions is defined and repo_names_for_codespaces_read_permissions.strip() %}{% set _cs_repos = repo_names_for_codespaces_read_permissions.split(',') | map('trim') | reject('equalto', '') | list %}{% if _cs_repos %}
+    "codespaces": {
+      "repositories": {
+{% for cs_repo_item in _cs_repos %}        {{ (repo_org_name ~ "/" ~ cs_repo_item) | tojson }}: {
+          "permissions": { "contents": "read" }
+        },
+{% endfor %}      }
+    },{% endif %}{% endif %}{% raw %}
   },
   "initializeCommand": "sh .devcontainer/initialize-command.sh",
   "onCreateCommand": "sh .devcontainer/on-create-command.sh",

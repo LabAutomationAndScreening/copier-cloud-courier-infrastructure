@@ -5,6 +5,7 @@ on:
     branches-ignore:
       - 'gh-readonly-queue/**' # don't run (again) when on these special branches created during merge groups; the `on: merge_group` already triggers it.
   merge_group:
+  pull_request:
 
 env:
   PYTHONUNBUFFERED: True
@@ -12,6 +13,7 @@ env:
 
 permissions:
   id-token: write # needed to assume OIDC roles (e.g. for downloading from CodeArtifact)
+  contents: read # need to explicitly provide this whenever defining permissions because the default value is 'none' for anything not explicitly set when permissions are defined
 
 jobs:
   get-values:
@@ -19,9 +21,27 @@ jobs:
     permissions:
       contents: write # needed for updating dependabot branches
 
+  check-skip-duplicate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read # needed to check if PR exists for current branch
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+      - id: check
+        uses: ./.github/actions/check-skip-duplicates
+
   pre-commit:
     needs:
       - get-values
+      - check-skip-duplicate
+    if: needs.check-skip-duplicate.outputs.should-run == 'true'
     uses: ./.github/workflows/pre-commit.yaml
     permissions:
       contents: write # needed for mutex
@@ -29,9 +49,46 @@ jobs:
     with:
       python-version: 3.12.7
 
+  unit-test:
+    needs:
+      - pre-commit
+      - check-skip-duplicate
+    if: needs.check-skip-duplicate.outputs.should-run == 'true'
+    strategy:
+      matrix:
+        os:
+          - "ubuntu-24.04"
+        python-version:
+
+          - 3.12.7
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install tooling
+        uses: ./.github/actions/install_deps
+        with:
+          python-version: ${{ matrix.python-version }}
+          node-version: 24.11.1
+
+      - name: Run Unit Tests
+        # TODO: figure out what to do about tests of copier task scripts that don't actually get detected by code coverage
+        run: uv run pytest tests/unit --durations=5 --no-cov
+
+
   lint-matrix:
     needs:
       - pre-commit
+      - check-skip-duplicate
+    if: needs.check-skip-duplicate.outputs.should-run == 'true'
     strategy:
       matrix:
         os:
@@ -70,6 +127,14 @@ jobs:
       - name: Instantiate copier template
         run: |
           copier copy --trust --vcs-ref ${{ github.sha }} ${{ matrix.copier }} --data python_version=${{ matrix.python-version }} . ./new-template
+
+      - name: Confirm instantiated template has copier answers file
+        run: |
+          if [ ! -f "./new-template/./.copier-answers.yml" ]; then
+            echo "Copier answers file not found in instantiated template location"
+            exit 1
+          fi
+
       - name: Delete files from initial repo
         run: |
           # Delete everything except the folder containing the instantiated template
@@ -78,7 +143,9 @@ jobs:
           rm -rf !(new-template)
           rm -rf .github # apparently this folder doesn't get removed with the previous command for some reason
           rm -rf .devcontainer # apparently this folder doesn't get removed with the previous command for some reason
+          rm -rf .claude # apparently this folder doesn't get removed with the previous command for some reason
           ls -la
+
       - name: Move the instantiated template into the repo root
         run: |
           # Move all the files from the instantiated template out of the subfolder
@@ -92,6 +159,7 @@ jobs:
 
       - name: install new dependencies
         env:
+          SKIP_PLAYWRIGHT_INSTALL: "1"
           # Provide a fake token so it doesn't attempt to access AWS to generate a new one when the script is run if CodeArtifact is set as the registry
           CODEARTIFACT_AUTH_TOKEN: 'faketoken'
         run: |
@@ -110,7 +178,7 @@ jobs:
         timeout-minutes: 8  # this is the amount of time this action will wait to attempt to acquire the mutex lock before failing, e.g. if other jobs are queued up in front of it
 
       - name: Cache Pre-commit hooks
-        uses: actions/cache@v5.0.2
+        uses: actions/cache@v5.0.5
         env:
           cache-name: cache-pre-commit-hooks
         with:
@@ -137,12 +205,21 @@ jobs:
           name: pre-commit-log--${{ github.jobs.lint-matrix.name }}
           path: "${{ github.workspace }}/.precommit_cache/pre-commit.log"
 
-  required-check:
+  confirm-on-tagged-copier-template:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    uses: ./.github/workflows/confirm-on-tagged-copier-template.yaml
+
+
+  workflow-summary:
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     needs:
-      - lint-matrix
       - get-values
+      - check-skip-duplicate
+      - confirm-on-tagged-copier-template
+      - pre-commit
+      - unit-test
+      - lint-matrix
     permissions:
       statuses: write # needed for updating status on Dependabot PRs
     if: always()
@@ -151,11 +228,28 @@ jobs:
         run: |
           success_pattern="^(skipped|success)$" # these are the possibilities: https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#needs-context
 
-          if [[ ! "${{ needs.lint-matrix.result }}" =~ $success_pattern ]]; then
+          if [[ ! "${{ needs.get-values.result }}" =~ $success_pattern ]] ||
+            [[ ! "${{ needs.confirm-on-tagged-copier-template.result }}" =~ $success_pattern ]] ||
+            [[ ! "${{ needs.check-skip-duplicate.result }}" =~ $success_pattern ]] ||
+            [[ ! "${{ needs.pre-commit.result }}" =~ $success_pattern ]] ||
+            [[ ! "${{ needs.unit-test.result }}" =~ $success_pattern ]] ||
+            [[ ! "${{ needs.lint-matrix.result }}" =~ $success_pattern ]]; then
             echo "❌ One or more jobs did not finish with skipped or success"
             exit 1
           fi
           echo "✅ All jobs finished with skipped or success"
+
+      - name: Mark the required-check as succeeded so the PR can be merged
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            -X POST -H "Accept: application/vnd.github.v3+json" \
+            "${{ github.event.pull_request.statuses_url }}" \
+            -f state=success -f context="required-check" -f description="✅ All required checks passed in the job triggered by pull_request" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
       - name: Mark updated dependabot hash commit as succeeded
         if: needs.get-values.outputs.dependabot-commit-created == 'true'
         env:
