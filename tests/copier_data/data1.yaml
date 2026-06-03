@@ -3,8 +3,12 @@ repo_name: the_best_repo
 repo_org_name: great-company
 is_open_source: true
 description: Doing amazing things
+install_claude_cli: false
 ssh_port_number: 12345
+pull_from_ecr: false
 use_windows_in_ci: false
+
+
 
 
 

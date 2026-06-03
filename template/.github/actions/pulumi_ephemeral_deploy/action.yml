@@ -41,6 +41,11 @@ inputs:
     default: true
     required: false
     description: Whether or not to install the Pulumi CLI
+  show-preview-comment-on-pr:
+    type: boolean
+    default: false
+    required: false
+    description: Whether or not to add a comment on to the PR with the pulumi preview details.
 
 
 
@@ -68,12 +73,29 @@ runs:
       shell: bash
 
     - name: AWS OIDC
-      uses: aws-actions/configure-aws-credentials@v4.2.0
+      uses: aws-actions/configure-aws-credentials@v5.1.1
       with:
         role-to-assume: arn:aws:iam::${{ inputs.aws-account-id }}:role/${{ inputs.aws-role-name }}
         aws-region: ${{ inputs.aws-region }}
 
     - name: Run CLI
-      working-directory: ${{ github.workspace }}/${{ inputs.project-dir }}
-      run: uv run python -m ${{ inputs.deploy-script-module-name }}.${{ inputs.deploy-script-name }} --stack=${{ inputs.stack-name }} ${{ inputs.cli-action }}
-      shell: bash
+      # apparently getting the stdout is nigh impossible in GHA, so this action helps
+      uses: mathiasvr/command-output@34408ea3d0528273faff3d9e201761ae96106cd0 # ratchet:mathiasvr/command-output@v2.0.0
+      id: pulumi-run
+      with:
+        # can't use working-directory with this action, so specifying it in the uv command
+        run: uv --directory ${{ github.workspace }}/${{ inputs.project-dir }} run python -m ${{ inputs.deploy-script-module-name }}.${{ inputs.deploy-script-name }} --stack=${{ inputs.stack-name }} ${{ inputs.cli-action }}
+        shell: bash
+
+    - name: Comment the Preview on the Pull Request
+      if: ${{ inputs.show-preview-comment-on-pr == 'true' }}
+      # pin this sha (v3.0.1) for extra security since this action has some permissions to write to the pull request comments
+      uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b
+      with:
+        message: |
+          :eyes: **Pulumi Preview for ${{ inputs.deploy-script-module-name }} stack ${{ inputs.stack-name }}:** :eyes:
+
+          ```bash
+          ${{ steps.pulumi-run.outputs.stdout }}
+          ```
+        comment-tag: previewonpr-${{ inputs.deploy-script-module-name }}-${{ inputs.stack-name }}

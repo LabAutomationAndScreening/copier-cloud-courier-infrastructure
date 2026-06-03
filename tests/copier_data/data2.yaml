@@ -3,8 +3,12 @@ repo_name: another_repo
 repo_org_name: initech
 is_open_source: false
 description: Doing crazy things! So many things!
+install_claude_cli: true
 ssh_port_number: 54321
+pull_from_ecr: true
 use_windows_in_ci: true
+
+
 
 
 

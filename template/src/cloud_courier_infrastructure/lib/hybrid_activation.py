@@ -257,14 +257,16 @@ class OnPremNode(ComponentResource):
                 append_resource_suffix(f"{lab_computer_config.resource_name}-{descriptor}", max_length=100),
                 name=f"{SSM_PARAMETER_PREFIX}/{alias}/folders/{descriptor}",
                 value=Output.all(data_bucket_name, folder_to_watch).apply(  # TODO: make these kwargs not args
-                    lambda args: args[1]
-                    .model_copy(
-                        update={
-                            "s3_bucket_name": args[0],
-                            "s3_key_prefix": f"{lab_computer_config.location.name.lower()}/{lab_computer_config.name.lower()}",
-                        }
+                    lambda args: (
+                        args[1]
+                        .model_copy(
+                            update={
+                                "s3_bucket_name": args[0],
+                                "s3_key_prefix": f"{lab_computer_config.location.name.lower()}/{lab_computer_config.name.lower()}",
+                            }
+                        )
+                        .model_dump_json()
                     )
-                    .model_dump_json()
                 ),
                 type=ssm.ParameterType.STRING,
                 tags=common_tags(),
@@ -282,7 +284,11 @@ class OnPremNode(ComponentResource):
             )
         ).apply(lambda result: len(result.ids) > 0)
         _ = has_been_activated.apply(
-            lambda been_activated: create_output_if_needed(  # it's a general anti-pattern to create resources inside an apply statement...but this is just a stack output, and I couldn't think of any other way
-                has_been_activated=been_activated, original_resource_name=original_resource_name, activation=activation
+            lambda been_activated: (
+                create_output_if_needed(  # it's a general anti-pattern to create resources inside an apply statement...but this is just a stack output, and I couldn't think of any other way
+                    has_been_activated=been_activated,
+                    original_resource_name=original_resource_name,
+                    activation=activation,
+                )
             )
         )
