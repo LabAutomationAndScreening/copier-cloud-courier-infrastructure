@@ -96,7 +96,7 @@ class OnPremNode(ComponentResource):
         )
         _ = RolePolicy(  # the native provider has some CloudControl error when the policy document had an output in it
             append_resource_suffix(f"{resource_name}-upload-data", max_length=100),
-            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            role=role.role_name,
             name="upload-data",
             policy=data_bucket_name.apply(
                 lambda bucket_name: get_policy_document(
@@ -122,7 +122,7 @@ class OnPremNode(ComponentResource):
         )
         _ = RolePolicy(  # the native provider gave some odd CloudControl error about the policy, even though it has no Outputs in it
             append_resource_suffix(f"{resource_name}-put-cloudwatch-metrics", max_length=100),
-            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            role=role.role_name,
             name="put-cloudwatch-metrics",
             policy=get_policy_document(
                 statements=[
@@ -145,7 +145,7 @@ class OnPremNode(ComponentResource):
         )
         _ = RolePolicy(  # the native provider gave some odd CloudControl error about the policy, even though it has no Outputs in it
             append_resource_suffix(f"{resource_name}-ssm-params", max_length=100),
-            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            role=role.role_name,
             name="ssm-params",
             policy=get_policy_document(
                 statements=[
@@ -164,7 +164,7 @@ class OnPremNode(ComponentResource):
         installed_agent_version_tag_key = "installed-cloud-courier-agent-version"  # Warning! This tag key is used in the Cloud Courier Agent, so changing it will require changes there as well
         _ = RolePolicy(  # the native provider gave some odd CloudControl error about the policy, even though it has no Outputs in it
             append_resource_suffix(f"{resource_name}-update-instance-tag", max_length=100),
-            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            role=role.role_name,
             name="update-instance-tag",
             policy=get_policy_document(
                 statements=[
@@ -199,7 +199,7 @@ class OnPremNode(ComponentResource):
         )
         _ = RolePolicy(  # the native provider has some CloudControl error when the policy document had an output in it
             append_resource_suffix(f"{resource_name}-create-ssm-logs", max_length=100),
-            role=role.role_name,  # type: ignore[reportArgumentType] # pyright somehow thinks that a role_name can be None...which cannot happen
+            role=role.role_name,
             name="create-ssm-logs",
             policy=ssm_logs_bucket_name.apply(
                 lambda bucket_name: get_policy_document(
