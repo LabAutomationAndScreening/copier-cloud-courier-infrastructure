@@ -109,7 +109,7 @@ permissions:
 jobs:
   pulumi:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       IAC_GITHUB_API_TOKENS: ${{ secrets.iac-github-api-tokens }} # only used in non-enterprise situations when not using full fledged Secrets Manager
     steps:
@@ -122,9 +122,10 @@ jobs:
         uses: ./.github/actions/install_deps
         with:
           python-version: ${{ inputs.PYTHON_VERSION }}
+          skip-installing-pulumi-cli: true # at the moment, we're more specifically installing the Pulumi CLI just in the target directory inside the pulumi_ephemeral_deploy action
 
       - name: Download Artifact
-        uses: actions/download-artifact@v7.0.0
+        uses: actions/download-artifact@v8.0.1
         if: ${{ inputs.DOWNLOAD_ARTIFACT_NAME != '' }}
         with:
           name: ${{ inputs.DOWNLOAD_ARTIFACT_NAME }}

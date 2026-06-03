@@ -16,11 +16,26 @@ on:
         type: boolean
         required: false
         default: false
+      release-tag:
+        description: 'Optional release tag (e.g. 1.0.6) to push to ECR; applied even if an image with the same build-context-hash already exists'
+        type: string
+        required: false
+        default: ''
       context:
         description: 'Build context path'
         type: string
         required: false
         default: './'
+      build-contexts:
+        description: 'Additional named build contexts (e.g. "repo-root=.")'
+        type: string
+        required: false
+        default: ''
+      additional-hash-paths:
+        description: 'Space-separated extra file paths (relative to repo root) to include in the build context hash'
+        type: string
+        required: false
+        default: ''
       push-role-name:
         type: string
         description: What's the IAM role name to use for Pushing to the ECR?
@@ -31,10 +46,18 @@ on:
         description: 'Should the image be saved as an artifact?'
         required: false
         default: false
+      artifact-retention-days:
+        type: number
+        description: 'Number of days to retain the uploaded image artifact'
+        required: false
+        default: 4
     outputs:
       artifact-name:
         description: 'The name of the uploaded artifact of the image tarball'
         value: ${{ jobs.build-image.outputs.artifact-name }}
+      full-image-tag:
+        description: 'The full image tag used for the built image (repository/name:context-hash)'
+        value: ${{ jobs.build-image.outputs.full-image-tag }}
 
 permissions:
     id-token: write
@@ -47,6 +70,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       artifact-name: ${{ steps.calculate-build-context-hash.outputs.image_name_no_slashes }}
+      full-image-tag: ${{ steps.calculate-build-context-hash.outputs.full_image_tag }}
     steps:
       - name: Parse ECR URL
         if: ${{ inputs.push-role-name != 'no-push' }}
@@ -72,16 +96,21 @@ jobs:
 
       - name: OIDC Auth for ECR
         if: ${{ inputs.push-role-name != 'no-push' }}
-        uses: aws-actions/configure-aws-credentials@v5.1.1
+        uses: ./.github/actions/ecr-auth
         with:
-          role-to-assume: arn:aws:iam::${{ steps.parse_ecr_url.outputs.aws_account_id }}:role/${{ inputs.push-role-name }}
+          role-arn: arn:aws:iam::${{ steps.parse_ecr_url.outputs.aws_account_id }}:role/${{ inputs.push-role-name }}
           aws-region: ${{ steps.parse_ecr_url.outputs.aws_region }}
 
       - name: Calculate hash of files in build context
         id: calculate-build-context-hash
         run: |
           python3 --version
-          BUILD_HASH=$(python3 .github/workflows/hash_git_files.py ${{ inputs.context }})
+          EXTRA_PATHS="${{ inputs.additional-hash-paths }}"
+          EXTRA_ARGS=""
+          if [ -n "$EXTRA_PATHS" ]; then
+            EXTRA_ARGS="--extra-paths $EXTRA_PATHS"
+          fi
+          BUILD_HASH=$(python3 .github/workflows/hash_git_files.py ${{ inputs.context }} $EXTRA_ARGS)
           echo "build_context_tag=context-${BUILD_HASH}" >> "$GITHUB_OUTPUT"
           echo "Calculated build context tag as: ${BUILD_HASH}"
 
@@ -89,6 +118,7 @@ jobs:
           IMAGE_NAME_NO_SLASHES="${IMAGE_NAME_WITH_NAMESPACE//\//-}"
           echo "image_name_no_slashes=${IMAGE_NAME_NO_SLASHES}" >> "$GITHUB_OUTPUT"
           echo "Image name without slashes: ${IMAGE_NAME_NO_SLASHES}"
+          echo "full_image_tag=${{ inputs.repository }}/${{ inputs.image_name }}:context-${BUILD_HASH}" >> "$GITHUB_OUTPUT"
 
       - name: Set up mutex # Github concurrency management is horrible, things get arbitrarily cancelled if queued up. So using mutex until github fixes itself. When multiple jobs are modifying cache at once, weird things can happen.  possible issue is https://github.com/actions/toolkit/issues/658
         if: ${{ inputs.push-role-name != 'no-push' }}
@@ -111,53 +141,79 @@ jobs:
             echo "status=notfound" >> $GITHUB_OUTPUT
           fi
 
-      - name: Login to Amazon ECR
-        if: ${{ inputs.push-role-name != 'no-push' && (steps.check-if-exists.outputs.status == 'notfound' || inputs.save-as-artifact ) }}
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2.0.1
-
       - name: Pull existing image to package as artifact
         if: ${{ inputs.save-as-artifact && steps.check-if-exists.outputs.status == 'found' }}
         run: |
-          docker pull ${{ inputs.repository }}/${{ inputs.image_name }}:${{ steps.calculate-build-context-hash.outputs.build_context_tag }}
+          docker pull ${{ steps.calculate-build-context-hash.outputs.full_image_tag }}
 
       - name: Set up Docker Buildx
         if: ${{ (inputs.save-as-artifact && inputs.push-role-name == 'no-push') || steps.check-if-exists.outputs.status == 'notfound' }}
-        uses: docker/setup-buildx-action@v3.11.1
+        uses: docker/setup-buildx-action@v4.0.0
         with:
-          version: v0.27.0
+          version: v0.33.0
 
       - name: Build Docker Image
         if: ${{ (inputs.save-as-artifact && inputs.push-role-name == 'no-push') || steps.check-if-exists.outputs.status == 'notfound' }}
-        uses: docker/build-push-action@v6.18.0
+        uses: docker/build-push-action@v7.1.0
         with:
           context: ${{ inputs.context }}
+          build-contexts: ${{ inputs.build-contexts }}
           push: ${{ inputs.push-role-name != 'no-push' && steps.check-if-exists.outputs.status == 'notfound' }}
           load: ${{ inputs.save-as-artifact }} # make the image available later for the `docker save` step
-          tags: ${{ inputs.repository }}/${{ inputs.image_name }}:${{ steps.calculate-build-context-hash.outputs.build_context_tag }}
+          tags: ${{ steps.calculate-build-context-hash.outputs.full_image_tag }}
 
       - name: Add git sha tag
         if: ${{ inputs.push-role-name != 'no-push' }}
         run: |
-          aws ecr batch-get-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids imageTag=${{ steps.calculate-build-context-hash.outputs.build_context_tag }} --query 'images[].imageManifest' --output text > manifest.json
-          aws ecr put-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-tag git-sha-${{ github.sha }} --image-manifest file://manifest.json
+          GIT_SHA_TAG="git-sha-${{ github.sha }}"
+          if aws ecr describe-images --region ${{ steps.parse_ecr_url.outputs.aws_region }} --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids imageTag="$GIT_SHA_TAG" > /dev/null 2>&1; then
+            echo "Tag $GIT_SHA_TAG already exists in ECR, skipping"
+          else
+            aws ecr batch-get-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids imageTag=${{ steps.calculate-build-context-hash.outputs.build_context_tag }} --query 'images[].imageManifest' --output text > manifest.json
+            aws ecr put-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-tag "$GIT_SHA_TAG" --image-manifest file://manifest.json
+          fi
 
       - name: Add tag for Production
         if: ${{ inputs.push-role-name != 'no-push' && inputs.tag-for-production }}
         run: |
           aws ecr batch-get-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids imageTag=${{ steps.calculate-build-context-hash.outputs.build_context_tag }} --query 'images[].imageManifest' --output text > manifest.json
-          # TODO: figure out some better conditional logic about adding a tag for the context in production, so we don't have to `|| true` at the end
-          aws ecr put-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-tag production--${{ steps.calculate-build-context-hash.outputs.build_context_tag }} --image-manifest file://manifest.json || true
-          aws ecr put-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-tag production--git-sha-${{ github.sha }} --image-manifest file://manifest.json
+          PRODUCTION_CONTEXT_TAG="production--${{ steps.calculate-build-context-hash.outputs.build_context_tag }}"
+          if aws ecr describe-images --region ${{ steps.parse_ecr_url.outputs.aws_region }} --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids imageTag="$PRODUCTION_CONTEXT_TAG" > /dev/null 2>&1; then
+            echo "Tag $PRODUCTION_CONTEXT_TAG already exists in ECR, skipping"
+          else
+            aws ecr put-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-tag "$PRODUCTION_CONTEXT_TAG" --image-manifest file://manifest.json
+          fi
+          PRODUCTION_SHA_TAG="production--git-sha-${{ github.sha }}"
+          if aws ecr describe-images --region ${{ steps.parse_ecr_url.outputs.aws_region }} --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids imageTag="$PRODUCTION_SHA_TAG" > /dev/null 2>&1; then
+            echo "Tag $PRODUCTION_SHA_TAG already exists in ECR, skipping"
+          else
+            aws ecr put-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-tag "$PRODUCTION_SHA_TAG" --image-manifest file://manifest.json
+          fi
+
+      - name: Add release tag
+        if: ${{ inputs.push-role-name != 'no-push' && inputs.release-tag != '' }}
+        run: |
+          RELEASE_TAG="${{ inputs.release-tag }}"
+          if ! [[ "$RELEASE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]]; then
+            echo "Invalid release-tag: '$RELEASE_TAG'. Must start with alphanumeric or underscore and contain only alphanumerics, dots, hyphens, underscores (max 128 chars)."
+            exit 1
+          fi
+          if aws ecr describe-images --region ${{ steps.parse_ecr_url.outputs.aws_region }} --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids imageTag="$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release tag '$RELEASE_TAG' already exists in ECR repository '${{ inputs.image_name }}'. Release tags are immutable; pick a new version or delete the existing tag if this was unintended."
+            exit 1
+          fi
+          aws ecr batch-get-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-ids imageTag=${{ steps.calculate-build-context-hash.outputs.build_context_tag }} --query 'images[].imageManifest' --output text > manifest.json
+          aws ecr put-image --registry-id=${{ steps.parse_ecr_url.outputs.aws_account_id }} --repository-name=${{ inputs.image_name }} --image-tag "$RELEASE_TAG" --image-manifest file://manifest.json
 
       - name: Save Docker Image as tar
         if: ${{ inputs.save-as-artifact }}
-        run: docker save -o ${{ steps.calculate-build-context-hash.outputs.image_name_no_slashes }}.tar ${{ inputs.repository }}/${{ inputs.image_name }}:${{ steps.calculate-build-context-hash.outputs.build_context_tag }}
+        run: docker save -o ${{ steps.calculate-build-context-hash.outputs.image_name_no_slashes }}.tar ${{ steps.calculate-build-context-hash.outputs.full_image_tag }}
 
       - name: Upload Docker Image Artifact
         if: ${{ inputs.save-as-artifact }}
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ${{ steps.calculate-build-context-hash.outputs.image_name_no_slashes }}
           path: ${{ steps.calculate-build-context-hash.outputs.image_name_no_slashes }}.tar
           if-no-files-found: error
+          retention-days: ${{ inputs.artifact-retention-days }}

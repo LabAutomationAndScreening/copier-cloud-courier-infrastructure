@@ -1,3 +1,6 @@
+# Scratch / temp files
+tmp/
+
 # IDE
 .vscode/
 .idea/
@@ -13,6 +16,32 @@
 .mypy_cache/
 .ruff_cache/
 .pipx_cache/
+
+
+# Claude
+.claude/backups
+.claude/cache
+.claude/file-history
+.claude/ide
+.claude/plugins
+.claude/projects
+.claude/session-env
+.claude/sessions
+.claude/shell-snapshots
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+.claude/.claude.json
+.claude/.caveman-active
+.claude/.credentials.json
+.claude/history.jsonl
+.claude/mcp-needs-auth-cache.json
+.claude/policy-limits.json
+## we manage the settings JSON by merging the JSONC files in the settings/ directory
+.claude/settings.json
+# Dolt database files (used by beads for Claude) (these are both automatically added when `bd init` is run...so not sure how to avoid them)
+.dolt/
+*.db
+
 
 # Vendor build/make
 dkms.conf
@@ -39,6 +68,10 @@ docs/_build
 tests/**/snapshots/*_actual.png
 tests/**/snapshots/*_diff.png
 pytest.log
+test-screenshots/
+playwright-report/
+test-results/
+.vitest-attachments/
 
 # test coverage
 tests/__coverage__
@@ -54,12 +87,15 @@ prof/
 # NodeJS
 node_modules/
 .pnpm-store/
+# TypeScript incremental build cache
+*.tsbuildinfo
 
 
 # Nuxt
 .output
 .data
 .nuxt
+.nuxtrc
 .nitro
 .cache
 # Nuxt generate creates a symlink to the dist folder, which can't have trailing slash
