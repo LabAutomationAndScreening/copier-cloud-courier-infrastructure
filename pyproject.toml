@@ -9,12 +9,12 @@ dependencies = [
 
 
     # Managed by upstream template
-    "pytest>=9.0.3",
+    "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-randomly>=4.1.0",
     "pyright[nodejs]>=1.1.409",
     "ty>=0.0.40",
-    "copier==9.15.1",
+    "copier==9.16.0",
     "copier-template-extensions==0.3.3"
 ]
 
